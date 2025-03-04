@@ -11,38 +11,41 @@ import {
   showIsochrones,
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
-import { FaTrash, FaDownload, FaEye, FaEyeSlash } from "react-icons/fa";
+import {
+  FaTrash,
+  FaDownload,
+  FaEye,
+  FaEyeSlash,
+  FaInfoCircle,
+} from "react-icons/fa";
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "./SPL_Logo.webp";
+import { Progress, Upload, message, Spin, Tooltip } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 
 // Helper function to generate random colors
 const getRandomColor = (): [number, number, number] => {
-  // Predefined distinct colors
   const colors: [number, number, number][] = [
-    [255, 0, 0], // Red
-    [0, 255, 0], // Green
-    [0, 0, 255], // Blue
-    [255, 165, 0], // Orange
-    [128, 0, 128], // Purple
-    [0, 128, 128], // Teal
-    [255, 192, 203], // Pink
-    [165, 42, 42], // Brown
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [255, 165, 0],
+    [128, 0, 128],
+    [0, 128, 128],
+    [255, 192, 203],
+    [165, 42, 42],
   ];
-
-  // Get a random color from the array
-  const randomIndex = Math.floor(Math.random() * colors.length);
-  return colors[randomIndex];
+  return colors[Math.floor(Math.random() * colors.length)];
 };
 
 // Normalize data to a consistent format
 const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
   if (fileType === "csv") {
-    // Normalize CSV data
     return data.map((row) => ({
       latitude: parseFloat(row.latitude),
       longitude: parseFloat(row.longitude),
-      properties: { ...row }, // Include all other fields as properties
+      properties: { ...row },
       geojson: JSON.stringify({
         type: "Feature",
         geometry: {
@@ -53,9 +56,7 @@ const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
       }),
     }));
   } else if (fileType === "json") {
-    // Normalize JSON data (assuming GeoJSON or custom JSON)
     if (data?.features) {
-      // GeoJSON FeatureCollection
       return data?.features.map((feature: any) => ({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
@@ -63,11 +64,10 @@ const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
         geojson: JSON.stringify(feature),
       }));
     } else {
-      // Custom JSON format
       return data.map((item: any) => ({
         latitude: item.latitude,
         longitude: item.longitude,
-        properties: { ...item }, // Include all other fields as properties
+        properties: { ...item },
         geojson: JSON.stringify({
           type: "Feature",
           geometry: {
@@ -88,8 +88,7 @@ const downloadCSV = (dataset: any) => {
     ...row.properties,
     latitude: row.latitude,
     longitude: row.longitude,
-    geojson: row.geojson,
-    isochrones: row.isochrones, // This will now contain just the geometry object
+    coverage: row.isochrones,
   }));
 
   const csv = Papa.unparse(csvData, { header: true });
@@ -97,10 +96,7 @@ const downloadCSV = (dataset: any) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${dataset.name.replace(
-    /\.[^/.]+$/,
-    ""
-  )}_with_isochrones.csv`;
+  link.download = `${dataset.name.replace(/\.[^/.]+$/, "")}_with_coverage.csv`;
   link.click();
   URL.revokeObjectURL(url);
 };
@@ -109,12 +105,18 @@ const LeftPanel = () => {
   const dispatch = useDispatch();
   const datasets = useSelector((state: RootState) => state.map.datasets);
   const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
-  const [fileUploaded, setFileUploaded] = useState(false); // Track file upload
+  const [fileUploaded, setFileUploaded] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [hubLocationFile, setHubLocationFile] = useState<File | null>(null);
+  const [populationFile, setPopulationFile] = useState<File | null>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       setFileUploaded(true);
+      setHubLocationFile(files[0]);
+
       Array.from(files).forEach((file) => {
         const reader = new FileReader();
         reader.onload = (e: ProgressEvent<FileReader>) => {
@@ -122,7 +124,6 @@ const LeftPanel = () => {
             const content = e.target.result as string;
             const id = `dataset-${Date.now()}`;
             const color = getRandomColor();
-            // Make stroked color darker version of the main color
             const strokedColor: [number, number, number] = color.map((c) =>
               Math.floor(c * 0.6)
             ) as [number, number, number];
@@ -170,37 +171,110 @@ const LeftPanel = () => {
     dispatch(removeDataset(id));
   };
 
+  const handlePopulationUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".csv")) {
+      message.error("Please upload a CSV file for population data.");
+      return;
+    }
+
+    setPopulationFile(file);
+    message.success("Population file selected successfully.");
+  };
+
+  const handleCalculatePopulation = async () => {
+    if (!hubLocationFile || !populationFile) {
+      message.error("Please upload both hub locations and population files.");
+      return;
+    }
+
+    setIsCalculating(true);
+    setUploadProgress(0);
+
+    try {
+      const hubFormData = new FormData();
+      hubFormData.append("file", hubLocationFile);
+
+      const hubResponse = await fetch(
+        "http://192.168.68.183:8000/upload_hub_locations/",
+        {
+          method: "POST",
+          body: hubFormData,
+          headers: {
+            Accept: "*/*",
+          },
+          mode: "cors",
+        }
+      );
+
+      if (!hubResponse.ok) throw new Error("Hub locations upload failed.");
+      setUploadProgress(50);
+
+      const populationFormData = new FormData();
+      populationFormData.append("file", populationFile);
+
+      const populationResponse = await fetch(
+        "http://192.168.68.183:8000/upload_population/",
+        {
+          method: "POST",
+          body: populationFormData,
+          headers: {
+            Accept: "*/*",
+          },
+          mode: "cors",
+        }
+      );
+
+      if (!populationResponse.ok) throw new Error("Population upload failed.");
+      setUploadProgress(100);
+
+      message.success("Population coverage analysis completed successfully.");
+    } catch (error) {
+      message.error("Failed to calculate population coverage.");
+      console.error(error);
+    } finally {
+      setIsCalculating(false);
+      setTimeout(() => setUploadProgress(0), 1000);
+    }
+  };
+
   return (
-    <div
-      className="p-6 bg-gradient-to-b from-gray-50 to-gray-100 h-screen text-gray-800 z-10 shadow-xl"
-      style={{ width: "22vw" }}
-    >
-      <div className="flex items-center mb-8">
+    <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-4 md:p-6 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
+      <div className="flex items-center mb-4 md:mb-8">
         <Image
-          src={SPL} // Add your logo file to the public directory
+          src={SPL}
           alt="SPL Logo"
           width={60}
           height={0}
-          className="rounded-lg shadow-md"
+          className="w-12 md:w-[60px] rounded-lg shadow-md"
         />
-        <h1 className="text-2xl font-bold ml-3 text-gray-900">GeoDashboard</h1>
+        <h1 className="text-xl md:text-2xl font-bold ml-3 text-gray-900">
+          GeoDashboard
+        </h1>
       </div>
-      <h2 className="text-xl font-semibold mb-6 text-gray-700">
-        Upload JSON or CSV Files
+
+      <h2 className="text-md md:text-lg font-semibold mb-4 md:mb-6 text-gray-700">
+        Upload Hub Locations (JSON or CSV)
       </h2>
+
       <input
         type="file"
         accept=".json,.csv"
         onChange={handleFileChange}
         multiple
-        className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg mb-6 bg-white hover:border-blue-500 transition-colors cursor-pointer"
+        className="w-full p-2 md:p-3 border-2 border-dashed border-gray-300 rounded-lg mb-4 md:mb-6 bg-white hover:border-blue-500 transition-colors cursor-pointer"
       />
-      <div className="mb-6">
-        <h3 className="text-lg font-medium mb-4 text-gray-700">Datasets</h3>
+
+      <div className="mb-4 md:mb-6">
+        <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 text-gray-700">
+          Uploaded Datasets
+        </h3>
         {datasets.map((dataset) => (
           <div
             key={dataset.id}
-            className="flex items-center justify-between mb-3 p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+            className="flex items-center justify-between mb-2 md:mb-3 p-2 md:p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center">
               <button
@@ -222,50 +296,119 @@ const LeftPanel = () => {
               </span>
             </div>
             <div className="flex items-center">
-              <button
-                onClick={() => handleDeleteDataset(dataset.id)}
-                className="text-gray-500 hover:text-red-500 transition-colors mr-3"
-              >
-                <FaTrash size={16} />
-              </button>
-              <button
-                onClick={() => downloadCSV(dataset)}
-                className={`text-gray-500 transition-colors ${
-                  dataset.hasIsochrones
-                    ? "hover:text-blue-500"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
-                disabled={!dataset.hasIsochrones}
-              >
-                <FaDownload size={16} />
-              </button>
+              <Tooltip title="Delete Dataset">
+                <button
+                  onClick={() => handleDeleteDataset(dataset.id)}
+                  className="text-gray-500 hover:text-red-500 transition-colors mr-3"
+                >
+                  <FaTrash size={16} />
+                </button>
+              </Tooltip>
+              <Tooltip title="Download Dataset with Coverage">
+                <button
+                  onClick={() => downloadCSV(dataset)}
+                  className={`text-gray-500 transition-colors ${
+                    dataset.hasIsochrones
+                      ? "hover:text-blue-500"
+                      : "opacity-50 cursor-not-allowed"
+                  }`}
+                  disabled={!dataset.hasIsochrones}
+                >
+                  <FaDownload size={16} />
+                </button>
+              </Tooltip>
             </div>
           </div>
         ))}
       </div>
+
       {fileUploaded && (
-        <>
-          <div className="mb-6">
+        <div className="space-y-4 md:space-y-6">
+          <div>
             <label className="block text-sm font-medium mb-2 text-gray-700">
-              Walking Distance (minutes):
+              Coverage Time Limit (minutes):
+              <Tooltip title="Enter the maximum walking time in minutes to calculate the area that can be reached on foot from each point">
+                <FaInfoCircle className="inline ml-2 text-gray-400" />
+              </Tooltip>
               <input
                 type="number"
                 value={timeLimit}
                 onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
                 min="1"
                 max="60"
-                className="w-full p-3 border border-gray-300 rounded-lg mt-1 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="w-full p-2 md:p-3 border border-gray-300 rounded-lg mt-1 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                placeholder="Enter walking time (1-60 minutes)"
               />
             </label>
           </div>
           <button
-            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg active:shadow-inner"
+            className="w-full py-2 md:py-3 px-4 md:px-6 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm text-sm md:text-base flex items-center justify-center"
             onClick={() => dispatch(showIsochrones())}
           >
             Calculate Walkable Coverage
+            <Tooltip title="Calculate the area that can be reached on foot from each point shown on the map">
+              <FaInfoCircle className="ml-2 text-white" />
+            </Tooltip>
           </button>
-        </>
+        </div>
       )}
+
+      <div className="mb-4 mt-4 md:mb-6">
+        <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 text-gray-700">
+          Population Coverage Analysis
+        </h3>
+        <div className="flex items-center space-x-2">
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handlePopulationUpload}
+            className="hidden"
+            id="population-upload"
+            disabled={isCalculating}
+          />
+          <label
+            htmlFor="population-upload"
+            className={`flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors cursor-pointer ${
+              isCalculating ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            <UploadOutlined className="mr-2" />
+            Select Population File
+          </label>
+          {populationFile && (
+            <span className="text-sm text-gray-600">{populationFile.name}</span>
+          )}
+        </div>
+
+        {hubLocationFile && populationFile && (
+          <button
+            onClick={handleCalculatePopulation}
+            disabled={isCalculating}
+            className={`w-full mt-6 py-3 md:py-4 px-6 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
+              isCalculating ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            {isCalculating ? (
+              <div className="flex items-center justify-center text-base">
+                <Spin className="mr-2" size="small" />
+                Calculating...
+              </div>
+            ) : (
+              <>Calculate Population Coverage</>
+            )}
+          </button>
+        )}
+
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="mt-4">
+            <Progress
+              percent={Math.round(uploadProgress)}
+              size="small"
+              status="active"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

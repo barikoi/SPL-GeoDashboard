@@ -12,6 +12,7 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
+
 const Tooltip = ({ hoveredObject, x, y }: any) => {
   if (!hoveredObject) return null;
 
@@ -179,7 +180,7 @@ function MapComponent() {
   ];
 
   return (
-    <div style={{ width: "78vw", height: "100vh", position: "relative" }}>
+    <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
       <DeckGL
         initialViewState={INITIAL_VIEW_STATE}
         controller={true}
@@ -193,50 +194,43 @@ function MapComponent() {
           }}
           style={{ width: "100%", height: "100%" }}
           mapStyle={`https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`}
-          // disable the default attribution
           attributionControl={false}
         >
           <AttributionControl customAttribution="Barikoi" />
         </Map>
       </DeckGL>
 
-      {/* Image in the bottom-left corner */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "10px",
-          left: "20px",
-          zIndex: 1000,
-        }}
-      >
-        <Image src={bkoiLogo} alt="BKOI Logo" width={60} height={0} />
+      <div className="absolute bottom-2 md:bottom-2 left-2 md:left-2 z-[1000]">
+        <Image
+          src={bkoiLogo}
+          alt="BKOI Logo"
+          width={40}
+          height={0}
+          className="w-8 md:w-[60px]"
+        />
       </div>
 
-      {hoverInfo && (
-        <Tooltip
-          hoveredObject={hoverInfo.object}
-          x={hoverInfo.x}
-          y={hoverInfo.y}
-        />
-      )}
       {showIsochrones && progress > 0 && progress < 100 && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "20px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "300px",
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            padding: "8px",
-            borderRadius: "4px",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
-          }}
-        >
+        <div className="absolute bottom-4 md:bottom-20 left-1/2 transform -translate-x-1/2 w-[280px] md:w-[300px] bg-white/80 p-2 md:p-4 rounded-lg shadow-md">
           <Progress percent={Math.round(progress)} status="active" />
-          <div style={{ textAlign: "center", marginTop: "4px" }}>
+          <div className="text-center mt-2 text-sm md:text-base">
             {Math.round(progress)}% Complete
           </div>
+        </div>
+      )}
+
+      {hoverInfo && (
+        <div
+          className="absolute z-10 pointer-events-none bg-white p-2 md:p-4 rounded-lg shadow-md text-sm md:text-base"
+          style={{ left: hoverInfo.x, top: hoverInfo.y }}
+        >
+          {Object.entries(hoverInfo.object?.properties || {}).map(
+            ([key, value]) => (
+              <div key={key}>
+                <strong>{key}:</strong> {String(value)}
+              </div>
+            )
+          )}
         </div>
       )}
     </div>

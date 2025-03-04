@@ -4,7 +4,7 @@ import LeftPanel from "@/Components/LeftPanel/LeftPanel";
 
 export default function Home() {
   return (
-    <div style={{ width: "100vw", height: "100vh", display: "flex" }}>
+    <div className="flex flex-col md:flex-row w-screen h-screen overflow-hidden">
       <LeftPanel />
       <MapComponent />
     </div>
