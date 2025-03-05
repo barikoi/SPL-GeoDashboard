@@ -198,7 +198,7 @@ const LeftPanel = () => {
       hubFormData.append("file", hubLocationFile);
 
       const hubResponse = await fetch(
-        "http://192.168.68.183:8000/upload_hub_locations/",
+        "http://202.72.236.166:8000/upload_hub_locations/",
         {
           method: "POST",
           body: hubFormData,
@@ -216,7 +216,7 @@ const LeftPanel = () => {
       populationFormData.append("file", populationFile);
 
       const populationResponse = await fetch(
-        "http://192.168.68.183:8000/upload_population/",
+        "http://202.72.236.166:8000/upload_population/",
         {
           method: "POST",
           body: populationFormData,
