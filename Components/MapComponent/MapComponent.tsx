@@ -1,4 +1,3 @@
-//@ts-nocheck
 // components/MapComponent.tsx
 import * as React from "react";
 import { useEffect, useState } from "react";
@@ -8,38 +7,47 @@ import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { setHoverInfo, updateDatasetWithIsochrones } from "@/store/mapSlice";
-import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
 
-const Tooltip = ({ hoveredObject, x, y }: any) => {
-  if (!hoveredObject) return null;
+// // Add proper types for the tooltip props
+// interface TooltipProps {
+//   hoveredObject: {
+//     properties: Record<string, unknown>;
+//   } | null;
+//   x: number;
+//   y: number;
+// }
 
-  return (
-    <div
-      style={{
-        position: "absolute",
-        zIndex: 1,
-        pointerEvents: "none",
-        left: x,
-        top: y,
-        backgroundColor: "white",
-        padding: "8px",
-        borderRadius: "4px",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
-      }}
-    >
-      <div>
-        {Object.entries(hoveredObject.properties || {}).map(([key, value]) => (
-          <div key={key}>
-            <strong>{key}:</strong> {String(value)}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+// const Tooltip = ({ hoveredObject, x, y }: TooltipProps) => {
+//   if (!hoveredObject) return null;
+
+//   return (
+//     <div
+//       style={{
+//         position: "absolute",
+//         zIndex: 1,
+//         pointerEvents: "none",
+//         left: x,
+//         top: y,
+//         backgroundColor: "white",
+//         padding: "8px",
+//         borderRadius: "4px",
+//         boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+//       }}
+//     >
+//       <div>
+//         {Object.entries(hoveredObject.properties || {}).map(([key, value]) => (
+//           <div key={key}>
+//             <strong>{key}:</strong> {String(value)}
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// };
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.6364439,
@@ -49,7 +57,20 @@ const INITIAL_VIEW_STATE = {
   bearing: 0,
 };
 
+// Add proper type for the isochrone data
+interface IsochroneData {
+  data: {
+    polygons: Array<{
+      geometry: {
+        coordinates: number[][][];
+      };
+    }>;
+  };
+  datasetId: string;
+}
+
 // Helper function to transform isochrone data to GeoJSON
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
   if (!isochrone || !isochrone.polygons || !Array.isArray(isochrone.polygons)) {
     console.error("Invalid isochrone data:", isochrone);
@@ -71,12 +92,10 @@ function MapComponent() {
   const showIsochrones = useSelector(
     (state: RootState) => state.map.showIsochrones
   );
-  const [isochrones, setIsochrones] = useState<
-    Array<{ data: any; datasetId: string }>
-  >([]);
+  const [isochrones, setIsochrones] = useState<IsochroneData[]>([]);
   const [progress, setProgress] = useState(0);
 
-  // Filter out isochrones that belong to datasets that no longer exist
+  // Fix useEffect dependencies
   useEffect(() => {
     const updatedIsochrones = isochrones.filter((isochrone) =>
       datasets.some((dataset) => dataset.id === isochrone.datasetId)
@@ -85,8 +104,9 @@ function MapComponent() {
     if (updatedIsochrones.length !== isochrones.length) {
       setIsochrones(updatedIsochrones);
     }
-  }, [datasets]);
+  }, [datasets, isochrones]);
 
+  // Fix useEffect dependencies for fetchIsochrones
   useEffect(() => {
     if (showIsochrones) {
       const fetchIsochrones = async () => {
@@ -142,7 +162,7 @@ function MapComponent() {
 
       fetchIsochrones();
     }
-  }, [showIsochrones]);
+  }, [showIsochrones, datasets, dispatch, timeLimit]);
 
   const layers = [
     ...datasets
@@ -155,6 +175,7 @@ function MapComponent() {
           getRadius: 100,
           getFillColor: [...dataset.color, 200],
           pickable: true,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onHover: (info: any) => {
             dispatch(setHoverInfo(info.object ? info : null));
           },

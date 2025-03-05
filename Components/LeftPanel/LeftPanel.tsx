@@ -1,4 +1,3 @@
-//@ts-nocheck
 // components/LeftPanel.tsx
 "use client";
 import React, { ChangeEvent, useState } from "react";
@@ -21,8 +20,16 @@ import {
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "./SPL_Logo.webp";
-import { Progress, Upload, message, Spin, Tooltip } from "antd";
+import { Progress, message, Spin, Tooltip } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+
+// Add proper types for the data
+interface DataPoint {
+  latitude: number;
+  longitude: number;
+  properties: Record<string, unknown>;
+  geojson: string;
+}
 
 // Helper function to generate random colors
 const getRandomColor = (): [number, number, number] => {
@@ -39,8 +46,11 @@ const getRandomColor = (): [number, number, number] => {
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
-// Normalize data to a consistent format
-const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
+// Update the normalizeData function with proper types
+const normalizeData = (
+  data: Record<string, unknown>[],
+  fileType: "csv" | "json"
+): DataPoint[] => {
   if (fileType === "csv") {
     return data.map((row) => ({
       latitude: parseFloat(row.latitude),
@@ -57,6 +67,7 @@ const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
     }));
   } else if (fileType === "json") {
     if (data?.features) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data?.features.map((feature: any) => ({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
@@ -64,6 +75,7 @@ const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
         geojson: JSON.stringify(feature),
       }));
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((item: any) => ({
         latitude: item.latitude,
         longitude: item.longitude,
@@ -82,8 +94,9 @@ const normalizeData = (data: any[], fileType: "csv" | "json"): any[] => {
   return [];
 };
 
-// Function to convert dataset to CSV and trigger download
-const downloadCSV = (dataset: any) => {
+// Update the downloadCSV function with proper types
+const downloadCSV = (dataset: { data: DataPoint[]; name: string }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const csvData = dataset.data.map((row: any) => ({
     ...row.properties,
     latitude: row.latitude,
