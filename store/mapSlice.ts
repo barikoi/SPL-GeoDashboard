@@ -9,6 +9,15 @@ interface Dataset {
   visible: boolean;
   color: [number, number, number];
   strokedColor: [number, number, number];
+  hasIsochrones?: boolean;
+  originalFile: any[];
+  downloadableData?: any[]; // Add this to store the processed data from API
+}
+
+interface SuggestedHub {
+  latitude: number;
+  longitude: number;
+  coverage: string;
 }
 
 interface MapState {
@@ -21,6 +30,7 @@ interface MapState {
   isochrones: any[];
   timeLimit: number; // Add timeLimit to the state
   showIsochrones: boolean; // Add this property
+  suggestedHubs: SuggestedHub[] | null;
 }
 
 const initialState: MapState = {
@@ -29,6 +39,7 @@ const initialState: MapState = {
   isochrones: [],
   timeLimit: 10, // Default time limit in minutes
   showIsochrones: false, // Add initial value
+  suggestedHubs: null,
 };
 
 const mapSlice = createSlice({
@@ -36,7 +47,11 @@ const mapSlice = createSlice({
   initialState,
   reducers: {
     addDataset: (state, action: PayloadAction<Dataset>) => {
-      state.datasets.push(action.payload);
+      const dataset = {
+        ...action.payload,
+        originalFile: action.payload.data, // Store the original file data
+      };
+      state.datasets.push(dataset);
       state.showIsochrones = false;
     },
     toggleDatasetVisibility: (state, action: PayloadAction<string>) => {
@@ -76,6 +91,23 @@ const mapSlice = createSlice({
         dataset.hasIsochrones = true; // Add flag to indicate isochrones are available
       }
     },
+    resetIsochrones: (state) => {
+      state.showIsochrones = false;
+    },
+    updateDatasetWithDownloadable: (
+      state,
+      action: PayloadAction<{ datasetId: string; downloadableData: any[] }>
+    ) => {
+      const dataset = state.datasets.find(
+        (d) => d.id === action.payload.datasetId
+      );
+      if (dataset) {
+        dataset.downloadableData = action.payload.downloadableData;
+      }
+    },
+    setSuggestedHubs: (state, action: PayloadAction<SuggestedHub[]>) => {
+      state.suggestedHubs = action.payload;
+    },
   },
 });
 
@@ -88,5 +120,8 @@ export const {
   setTimeLimit,
   showIsochrones,
   updateDatasetWithIsochrones,
+  resetIsochrones,
+  updateDatasetWithDownloadable,
+  setSuggestedHubs,
 } = mapSlice.actions;
 export default mapSlice.reducer;

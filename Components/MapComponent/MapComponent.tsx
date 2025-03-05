@@ -6,7 +6,11 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
-import { setHoverInfo, updateDatasetWithIsochrones } from "@/store/mapSlice";
+import {
+  setHoverInfo,
+  updateDatasetWithIsochrones,
+  resetIsochrones,
+} from "@/store/mapSlice";
 import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
@@ -94,6 +98,9 @@ function MapComponent() {
   );
   const [isochrones, setIsochrones] = useState<IsochroneData[]>([]);
   const [progress, setProgress] = useState(0);
+  const suggestedHubs = useSelector(
+    (state: RootState) => state.map.suggestedHubs
+  );
 
   // Fix useEffect dependencies
   useEffect(() => {
@@ -118,46 +125,56 @@ function MapComponent() {
         let processedPoints = 0;
         setProgress(0);
 
-        for (const dataset of datasets) {
-          if (dataset.visible) {
-            const updatedData = [];
-            for (const point of dataset.data) {
-              try {
-                const response = await fetch(
-                  `https://gh.bmapsbd.com/sau/isochrone?point=${
-                    point.latitude
-                  },${point.longitude}&profile=foot&time_limit=${
-                    timeLimit * 60
-                  }&reverse_flow=true`
-                );
-                const isochroneData = await response.json();
-                // Transform to just the geometry and store it
-                const geometry = transformIsochroneToGeometry(isochroneData);
-                updatedData.push({
-                  ...point,
-                  isochrones: geometry ? JSON.stringify(geometry) : null, // Store just the geometry
-                });
-                newIsochrones.push({
-                  data: isochroneData,
-                  datasetId: dataset.id,
-                });
-                processedPoints++;
-                setProgress((processedPoints / totalPoints) * 100);
-              } catch (error) {
-                console.error("Error fetching isochrone data:", error);
-                updatedData.push(point);
+        try {
+          for (const dataset of datasets) {
+            if (dataset.visible) {
+              const updatedData = [];
+              for (const point of dataset.data) {
+                try {
+                  const response = await fetch(
+                    `https://gh.bmapsbd.com/sau/isochrone?point=${
+                      point.latitude
+                    },${point.longitude}&profile=foot&time_limit=${
+                      timeLimit * 60
+                    }&reverse_flow=true`
+                  );
+                  const isochroneData = await response.json();
+                  const geometry = transformIsochroneToGeometry(isochroneData);
+                  updatedData.push({
+                    ...point,
+                    isochrones: geometry ? JSON.stringify(geometry) : null,
+                  });
+                  newIsochrones.push({
+                    data: isochroneData,
+                    datasetId: dataset.id,
+                  });
+                  processedPoints++;
+                  setProgress((processedPoints / totalPoints) * 100);
+                } catch (error) {
+                  console.error("Error fetching isochrone data:", error);
+                  updatedData.push(point);
+                }
               }
+              dispatch(
+                updateDatasetWithIsochrones({
+                  datasetId: dataset.id,
+                  updatedData,
+                })
+              );
             }
-            dispatch(
-              updateDatasetWithIsochrones({
-                datasetId: dataset.id,
-                updatedData,
-              })
-            );
           }
+          setIsochrones(newIsochrones);
+
+          // Reset showIsochrones after successful fetch
+          setTimeout(() => {
+            setProgress(0);
+            dispatch(resetIsochrones());
+          }, 1000);
+        } catch (error) {
+          console.error("Error in fetchIsochrones:", error);
+          setProgress(0);
+          dispatch(resetIsochrones());
         }
-        setIsochrones(newIsochrones);
-        setTimeout(() => setProgress(0), 1000);
       };
 
       fetchIsochrones();
@@ -197,6 +214,34 @@ function MapComponent() {
             });
           })
           .filter(Boolean)
+      : []),
+    ...(suggestedHubs
+      ? [
+          // Points layer for suggested hubs
+          new ScatterplotLayer({
+            id: "suggested-hubs-points",
+            data: suggestedHubs,
+            getPosition: (d) => [d.longitude, d.latitude],
+            getRadius: 150,
+            getFillColor: [83, 19, 30, 200], // Green color for suggested hubs
+            pickable: true,
+            onHover: (info: any) => {
+              dispatch(setHoverInfo(info.object ? info : null));
+            },
+          }),
+          // Coverage polygons layer
+          new GeoJsonLayer({
+            id: "suggested-hubs-coverage",
+            data: suggestedHubs.map((hub) => ({
+              type: "Feature",
+              geometry: JSON.parse(hub.coverage),
+              properties: {}, // Optional metadata
+            })),
+            getFillColor: [83, 19, 30, 80], // Transparent green
+            getLineColor: [83, 19, 30, 200],
+            getLineWidth: 4,
+          }),
+        ]
       : []),
   ];
 
