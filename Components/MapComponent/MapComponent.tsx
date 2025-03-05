@@ -101,6 +101,8 @@ function MapComponent() {
   const suggestedHubs = useSelector(
     (state: RootState) => state.map.suggestedHubs
   );
+  const [isochronesCalculated, setIsochronesCalculated] = useState(false);
+  const [isochroneLayers, setIsochroneLayers] = useState<any[]>([]);
 
   // Fix useEffect dependencies
   useEffect(() => {
@@ -164,8 +166,32 @@ function MapComponent() {
             }
           }
           setIsochrones(newIsochrones);
+          setIsochronesCalculated(true);
 
-          // Reset showIsochrones after successful fetch
+          // Create isochrone layers
+          const newLayers = datasets
+            .filter((dataset) => dataset.visible)
+            .flatMap((dataset) =>
+              dataset.data.some((d: any) => d.isochrones)
+                ? [
+                    new GeoJsonLayer({
+                      id: `isochrone-layer-${dataset.id}`,
+                      data: dataset.data
+                        .filter((d: any) => d.isochrones)
+                        .map((d: any) => ({
+                          type: "Feature",
+                          geometry: JSON.parse(d.isochrones),
+                          properties: {},
+                        })),
+                      getFillColor: [...dataset.color, 100],
+                      getLineColor: dataset.strokedColor,
+                      getLineWidth: 2,
+                    }),
+                  ]
+                : []
+            );
+          setIsochroneLayers(newLayers);
+
           setTimeout(() => {
             setProgress(0);
             dispatch(resetIsochrones());
@@ -174,6 +200,8 @@ function MapComponent() {
           console.error("Error in fetchIsochrones:", error);
           setProgress(0);
           dispatch(resetIsochrones());
+          setIsochronesCalculated(false);
+          setIsochroneLayers([]);
         }
       };
 
@@ -198,23 +226,7 @@ function MapComponent() {
           },
         }),
       ]),
-    ...(showIsochrones
-      ? isochrones
-          .map((isochrone, index) => {
-            const dataset = datasets.find((d) => d.id === isochrone.datasetId);
-            // Skip if dataset is not found or not visible
-            if (!dataset || !dataset.visible) return null;
-
-            return new GeoJsonLayer({
-              id: `isochrone-layer-${index}`,
-              data: transformIsochroneToGeometry(isochrone.data),
-              getFillColor: [...dataset.color, 100],
-              getLineColor: dataset.strokedColor,
-              getLineWidth: 2,
-            });
-          })
-          .filter(Boolean)
-      : []),
+    ...(isochronesCalculated ? isochroneLayers : []),
     ...(suggestedHubs
       ? [
           // Points layer for suggested hubs

@@ -136,7 +136,6 @@ const LeftPanel = () => {
       setFileUploaded(true);
       setHubLocationFile(files[0]);
 
-      // First process the file for visualization
       Array.from(files).forEach((file) => {
         const reader = new FileReader();
         reader.onload = async (e: ProgressEvent<FileReader>) => {
@@ -150,36 +149,27 @@ const LeftPanel = () => {
               number
             ];
 
-            // Process file for visualization
-            if (file.name.endsWith(".json") || file.name.endsWith(".csv")) {
-              // Create form data for API
-              const formData = new FormData();
-              formData.append("file", file);
-
-              try {
-                // Get processed data from API
-                const response = await fetch(
-                  "http://202.72.236.166:8000/upload_hub_locations/",
-                  {
-                    method: "POST",
-                    body: formData,
-                    headers: {
-                      Accept: "*/*",
-                    },
-                    mode: "cors",
-                  }
-                );
-
-                if (!response.ok) {
-                  throw new Error("Failed to process file");
-                }
-
-                const processedData = await response.json();
-
-                // Add dataset with both visualization and processed data
-                if (file.name.endsWith(".json")) {
-                  const jsonData = JSON.parse(content);
-                  const normalizedData = normalizeData(jsonData, "json");
+            // Only process file for visualization, don't upload to API yet
+            if (file.name.endsWith(".json")) {
+              const jsonData = JSON.parse(content);
+              const normalizedData = normalizeData(jsonData, "json");
+              dispatch(
+                addDataset({
+                  id,
+                  name: file.name,
+                  data: normalizedData,
+                  visible: true,
+                  color,
+                  strokedColor,
+                  originalFile: jsonData,
+                })
+              );
+            } else if (file.name.endsWith(".csv")) {
+              Papa.parse(content, {
+                header: true,
+                dynamicTyping: true,
+                complete: (result) => {
+                  const normalizedData = normalizeData(result.data, "csv");
                   dispatch(
                     addDataset({
                       id,
@@ -188,45 +178,11 @@ const LeftPanel = () => {
                       visible: true,
                       color,
                       strokedColor,
-                      originalFile: jsonData,
+                      originalFile: result.data,
                     })
                   );
-                  dispatch(
-                    updateDatasetWithDownloadable({
-                      datasetId: id,
-                      downloadableData: processedData,
-                    })
-                  );
-                } else if (file.name.endsWith(".csv")) {
-                  Papa.parse(content, {
-                    header: true,
-                    dynamicTyping: true,
-                    complete: (result) => {
-                      const normalizedData = normalizeData(result.data, "csv");
-                      dispatch(
-                        addDataset({
-                          id,
-                          name: file.name,
-                          data: normalizedData,
-                          visible: true,
-                          color,
-                          strokedColor,
-                          originalFile: result.data,
-                        })
-                      );
-                      dispatch(
-                        updateDatasetWithDownloadable({
-                          datasetId: id,
-                          downloadableData: processedData,
-                        })
-                      );
-                    },
-                  });
-                }
-              } catch (error) {
-                console.error("Error processing file:", error);
-                message.error("Failed to process file");
-              }
+                },
+              });
             }
           }
         };
@@ -262,7 +218,7 @@ const LeftPanel = () => {
     setUploadProgress(0);
 
     try {
-      // Upload hub locations
+      // First upload hub locations
       const hubFormData = new FormData();
       hubFormData.append("file", hubLocationFile);
 
@@ -279,9 +235,23 @@ const LeftPanel = () => {
       );
 
       if (!hubResponse.ok) throw new Error("Hub locations upload failed.");
+
+      const processedData = await hubResponse.json();
+
+      // Update dataset with processed data
+      const dataset = datasets.find((d) => d.visible);
+      if (dataset) {
+        dispatch(
+          updateDatasetWithDownloadable({
+            datasetId: dataset.id,
+            downloadableData: processedData,
+          })
+        );
+      }
+
       setUploadProgress(33);
 
-      // Upload population data
+      // Continue with population upload and calculation
       const populationFormData = new FormData();
       populationFormData.append("file", populationFile);
 
@@ -300,7 +270,7 @@ const LeftPanel = () => {
       if (!populationResponse.ok) throw new Error("Population upload failed.");
       setUploadProgress(66);
 
-      // Calculate hubs after both uploads are successful
+      // Calculate hubs
       const calculateResponse = await fetch(
         "http://202.72.236.166:8000/calculate_hubs/?radius=2000",
         {
@@ -354,10 +324,8 @@ const LeftPanel = () => {
     }
   };
 
-  // Only show Calculate Population Coverage button if we have downloadable data
-  const hasDownloadableData = datasets.some(
-    (dataset) => dataset.downloadableData && dataset.visible
-  );
+  // Change this condition
+  const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
   return (
     <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-4 md:p-6 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
@@ -472,8 +440,8 @@ const LeftPanel = () => {
         </div>
       )}
 
-      {/* Only show population upload and calculate if we have downloadable data */}
-      {hasDownloadableData && (
+      {/* Change the condition here */}
+      {showPopulationSection && (
         <div className="mb-4 mt-4 md:mb-6">
           <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 text-gray-700">
             Population Coverage Analysis
@@ -534,8 +502,10 @@ const LeftPanel = () => {
         </div>
       )}
 
-      {/* Add after Calculate Population Coverage button */}
-      {hasDownloadableData && (
+      {/* Change this condition too */}
+      {datasets.some(
+        (dataset) => dataset.downloadableData && dataset.visible
+      ) && (
         <div className="mt-4">
           <button
             onClick={handleGetSuggestedHubs}
