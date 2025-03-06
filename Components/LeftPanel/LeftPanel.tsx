@@ -32,6 +32,7 @@ interface DataPoint {
   properties: Record<string, unknown>;
   geojson: string;
   isochrones?: unknown;
+  coverage?: any;
 }
 
 // Helper function to generate random colors
@@ -49,7 +50,17 @@ const getRandomColor = (): [number, number, number] => {
   return colors[Math.floor(Math.random() * colors.length)];
 };
 
-// Update the normalizeData function with proper types
+// Add this helper function near the top with other helpers
+const parseCoverageString = (coverageString: string): any => {
+  try {
+    return JSON.parse(coverageString);
+  } catch (error) {
+    console.error("Error parsing coverage string:", error);
+    return null;
+  }
+};
+
+// Update the normalizeData function to include coverage
 const normalizeData = (
   data: Record<string, any>[],
   fileType: "csv" | "json"
@@ -70,6 +81,7 @@ const normalizeData = (
         },
         properties: { ...row },
       }),
+      coverage: row.coverage ? parseCoverageString(row.coverage) : null,
     }));
   } else if (fileType === "json") {
     if ("features" in data) {
@@ -208,7 +220,7 @@ const LeftPanel = () => {
           }
         }
       };
-      reader.readAsText(file);
+      reader?.readAsText(file);
     }
   };
 
@@ -235,7 +247,7 @@ const LeftPanel = () => {
         });
       }
     };
-    reader.readAsText(file);
+    reader?.readAsText(file);
   };
 
   const handleDeleteDataset = (id: string) => {
@@ -390,148 +402,174 @@ const LeftPanel = () => {
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
   return (
-    <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-4 md:p-6 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
+    <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-3 md:p-4 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
+      {/* Header Section - more compact */}
       <div className="flex items-center mb-3">
         <Image
           src={SPL}
           alt="SPL Logo"
-          width={40}
+          width={32}
           height={0}
-          className="w-8 md:w-[40px] rounded-lg shadow-md"
+          className="w-6 md:w-12 rounded-lg shadow-md"
         />
-        <h1 className="text-lg md:text-xl font-bold ml-2 text-gray-900">
+        <h1 className="text-base md:text-lg font-bold ml-2 text-gray-900">
           GeoDashboard
         </h1>
       </div>
 
-      <h2 className="text-sm md:text-base font-semibold mb-3 text-gray-700">
-        Upload Hub Locations (JSON or CSV)
-      </h2>
+      {/* Step 1: More compact padding and text */}
+      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+        <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
+          Step 1: Upload Hub Locations
+        </h2>
+        <input
+          type="file"
+          accept=".json,.csv"
+          onChange={handleFileChange}
+          className="w-full p-1.5 border-2 border-dashed border-gray-300 rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs"
+        />
 
-      <input
-        type="file"
-        accept=".json,.csv"
-        onChange={handleFileChange}
-        className="w-full p-2 border-2 border-dashed border-gray-300 rounded-lg mb-3 bg-white hover:border-blue-500 transition-colors cursor-pointer text-sm"
-      />
-
-      <div className="mb-4 md:mb-6">
-        <h3 className="text-sm md:text-base font-medium mb-2 text-gray-700">
-          Uploaded Datasets
-        </h3>
-        {datasets.map((dataset) => (
-          <div
-            key={dataset.id}
-            className="flex items-center justify-between mb-2 p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
-          >
-            <div className="flex items-center">
-              <button
-                onClick={() => dispatch(toggleDatasetVisibility(dataset.id))}
-                className="mr-3 text-gray-500 hover:text-blue-500 transition-colors"
-              >
-                {dataset.visible ? (
-                  <FaEye size={16} />
-                ) : (
-                  <FaEyeSlash size={16} />
-                )}
-              </button>
-              <div
-                className="w-4 h-4 mr-3 rounded-full shadow-inner"
-                style={{ backgroundColor: `rgb(${dataset.color.join(",")})` }}
-              />
-              <span className="text-sm font-medium text-gray-700">
-                {dataset.name}
-              </span>
+        {showCoverageError && (
+          <>
+            <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-xs">
+              ⚠️ This file needs walkable coverage data. Please:
+              <ol className="ml-3 mt-0.5 list-decimal">
+                <li>Calculate walkable coverage below</li>
+                <li>Download the processed file</li>
+                <li>Upload it here</li>
+              </ol>
             </div>
-            <div className="flex items-center">
-              <Tooltip title="Delete Dataset">
-                <button
-                  onClick={() => handleDeleteDataset(dataset.id)}
-                  className="text-gray-500 hover:text-red-500 transition-colors mr-3"
-                >
-                  <FaTrash size={16} />
-                </button>
-              </Tooltip>
-              <Tooltip title="Download Dataset with Coverage">
-                <button
-                  onClick={() => downloadCSV(dataset)}
-                  className={`text-gray-500 transition-colors ${
-                    dataset.hasIsochrones
-                      ? "hover:text-blue-500"
-                      : "opacity-50 cursor-not-allowed"
-                  }`}
-                  disabled={!dataset.hasIsochrones}
-                >
-                  <FaDownload size={16} />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
-        ))}
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleProcessedHubFile}
+              className="w-full p-1.5 border-2 border-dashed border-red-300 rounded-lg hover:border-red-500 transition-colors cursor-pointer text-xs"
+              placeholder="Upload processed file with coverage data"
+            />
+          </>
+        )}
       </div>
 
-      {fileUploaded && (
-        <div className="space-y-4 md:space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
-              Coverage Time Limit (minutes):
-              <Tooltip title="Enter the maximum walking time in minutes to calculate the area that can be reached on foot from each point">
-                <FaInfoCircle className="inline ml-2 text-gray-400" />
-              </Tooltip>
-              <input
-                type="number"
-                value={timeLimit}
-                onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
-                min="1"
-                max="60"
-                className="w-full p-2 md:p-3 border border-gray-300 rounded-lg mt-1 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                placeholder="Enter walking time (1-60 minutes)"
-              />
-            </label>
+      {/* Step 2: More compact dataset list and controls */}
+      {fileUploaded && !hasCoverageColumn && (
+        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
+            Step 2: Calculate Walkable Coverage
+          </h2>
+
+          {/* Dataset list with download options */}
+          <div className="mb-3">
+            <h3 className="text-xs font-medium mb-1.5 text-gray-600">
+              Uploaded Datasets:
+            </h3>
+            {datasets.map((dataset) => (
+              <div
+                key={dataset.id}
+                className="flex items-center justify-between mb-1.5 p-1.5 bg-gray-50 rounded-lg"
+              >
+                <div className="flex items-center">
+                  <button
+                    onClick={() =>
+                      dispatch(toggleDatasetVisibility(dataset.id))
+                    }
+                    className="mr-2 text-gray-500 hover:text-blue-500 transition-colors"
+                  >
+                    {dataset.visible ? (
+                      <FaEye size={14} />
+                    ) : (
+                      <FaEyeSlash size={14} />
+                    )}
+                  </button>
+                  <div
+                    className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                    style={{
+                      backgroundColor: `rgb(${dataset.color.join(",")})`,
+                    }}
+                  />
+                  <span className="text-xs font-medium text-gray-700">
+                    {dataset.name}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Tooltip title="Delete Dataset">
+                    <button
+                      onClick={() => handleDeleteDataset(dataset.id)}
+                      className="text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      <FaTrash size={14} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip
+                    title={
+                      dataset.hasIsochrones
+                        ? "Download Dataset with Coverage"
+                        : "Calculate coverage first"
+                    }
+                  >
+                    <button
+                      onClick={() => downloadCSV(dataset)}
+                      className={`text-gray-500 transition-colors ${
+                        dataset.hasIsochrones
+                          ? "hover:text-blue-500"
+                          : "opacity-50 cursor-not-allowed"
+                      }`}
+                      disabled={!dataset.hasIsochrones}
+                    >
+                      <FaDownload size={14} />
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+            ))}
           </div>
+
+          {/* Walking time input and calculate button */}
+          <div className="mb-2">
+            <label className="block text-xs font-medium mb-1 text-gray-700">
+              Walking Time (min):
+              <Tooltip title="Maximum walking time from each point. For example, in 10 minutes, you can cover a certain distance from each point.">
+                <span>
+                  <FaInfoCircle
+                    className="inline ml-1 text-gray-400"
+                    size={12}
+                  />
+                </span>
+              </Tooltip>
+            </label>
+            <input
+              type="number"
+              value={timeLimit}
+              onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
+              min="1"
+              max="60"
+              className="w-full p-1.5 border border-gray-300 rounded-lg bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs"
+              placeholder="1-60 minutes"
+            />
+          </div>
+
           <button
-            className="w-full py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm text-sm flex items-center justify-center"
             onClick={() => dispatch(showIsochrones())}
+            className="w-full py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center"
           >
             Calculate Walkable Coverage
-            <Tooltip title="Calculate the area that can be reached on foot from each point shown on the map">
-              <FaInfoCircle className="ml-2 text-white text-xs" />
-            </Tooltip>
           </button>
         </div>
       )}
 
-      {showCoverageError && (
-        <div className="mb-4 mt-4">
-          <div className="p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg mb-2 text-sm">
-            This file doesn't contain coverage data. Please calculate walkable
-            coverage first and download the processed file and upload it below.
-          </div>
-
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleProcessedHubFile}
-            className="w-full p-2 border-2 border-dashed border-red-500 rounded-lg bg-white hover:border-blue-500 transition-colors cursor-pointer text-sm"
-          />
-        </div>
-      )}
-
-      {/* Change the condition here */}
+      {/* Step 3: More compact population analysis section */}
       {showPopulationSection && (
-        <div className="mb-4 mt-4 md:mb-6">
-          <h3 className="text-sm md:text-base font-medium mb-2 text-gray-700">
-            Population Coverage Analysis
-          </h3>
+        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
+            Step 3: Population Coverage
+          </h2>
 
           {showCoverageError && !processedHubFile && (
-            <div className="p-2 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-2 text-sm">
-              Please calculate walkable coverage and upload the processed file
-              to proceed
+            <div className="p-2 mb-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+              ⚠️ Complete Step 2 first and upload processed file
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
+          <div className="mb-2">
             <input
               type="file"
               accept=".csv"
@@ -542,17 +580,17 @@ const LeftPanel = () => {
             />
             <label
               htmlFor="population-upload"
-              className={`flex items-center px-3 py-1.5 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors cursor-pointer ${
+              className={`flex items-center px-2.5 py-1.5 bg-gray-600 text-white text-xs rounded-lg hover:bg-gray-700 transition-colors cursor-pointer ${
                 isCalculating ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
-              <UploadOutlined className="mr-2" />
+              <UploadOutlined className="mr-1.5" />
               Select Population File
             </label>
             {populationFile && (
-              <span className="text-sm text-gray-600">
-                {populationFile.name}
-              </span>
+              <div className="mt-1 text-xs text-gray-600">
+                Selected: {populationFile.name}
+              </div>
             )}
           </div>
 
@@ -562,19 +600,19 @@ const LeftPanel = () => {
               disabled={
                 isCalculating || (showCoverageError && !processedHubFile)
               }
-              className={`w-full mt-4 py-2 px-4 bg-blue-600 text-white text-base font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
+              className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating || (showCoverageError && !processedHubFile)
                   ? "opacity-50 cursor-not-allowed"
                   : ""
               }`}
             >
               {isCalculating ? (
-                <div className="flex items-center justify-center text-sm">
-                  <Spin className="mr-2" size="small" />
+                <div className="flex items-center justify-center">
+                  <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
               ) : showCoverageError && !processedHubFile ? (
-                "Upload Processed File to Continue"
+                "Complete Previous Steps First"
               ) : (
                 "Calculate Population Coverage"
               )}
@@ -582,7 +620,7 @@ const LeftPanel = () => {
           )}
 
           {uploadProgress > 0 && uploadProgress < 100 && (
-            <div className="mt-4">
+            <div className="mt-2">
               <Progress
                 percent={Math.round(uploadProgress)}
                 size="small"
@@ -593,27 +631,26 @@ const LeftPanel = () => {
         </div>
       )}
 
-      {/* Change this condition too */}
+      {/* Suggested Hubs Section - more compact */}
       {datasets.some((dataset) => dataset.visible) && (
-        <div className="mt-4 space-y-1.5">
+        <div className="p-3 bg-white rounded-lg shadow-sm">
           <button
             onClick={handleGetSuggestedHubs}
             disabled={isLoadingSuggestions}
-            className={`w-full py-2 px-4 bg-green-600 text-white text-base font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
+            className={`w-full py-1.5 px-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm text-xs font-medium ${
               isLoadingSuggestions ? "opacity-75 cursor-not-allowed" : ""
             }`}
           >
-            <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center justify-center space-x-1.5">
               <span>Get Suggested Hubs</span>
               {isLoadingSuggestions && <Spin size="small" />}
             </div>
           </button>
+
           {suggestedHubsCount !== null && (
-            <div className="text-center p-1.5 bg-gray-100 rounded-lg">
-              <span className="font-medium text-sm">
-                Found {suggestedHubsCount} suggested hub
-                {suggestedHubsCount !== 1 ? "s" : ""}
-              </span>
+            <div className="mt-2 p-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg text-xs text-center">
+              Found {suggestedHubsCount} suggested hub
+              {suggestedHubsCount !== 1 ? "s" : ""}
             </div>
           )}
         </div>

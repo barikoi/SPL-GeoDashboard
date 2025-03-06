@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
+import { HexagonLayer } from "@deck.gl/aggregation-layers";
 import {
   setHoverInfo,
   updateDatasetWithIsochrones,
@@ -15,6 +16,7 @@ import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
+import { PickingInfo } from "@deck.gl/core/typed";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.6364439,
@@ -36,6 +38,15 @@ interface IsochroneData {
   datasetId: string;
 }
 
+// Add this type definition
+interface DataPoint {
+  latitude: number;
+  longitude: number;
+  properties: Record<string, unknown>;
+  geojson: string;
+  coverage?: any; // Coverage polygon data
+}
+
 // Helper function to transform isochrone data to GeoJSON
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
@@ -51,21 +62,53 @@ const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
   };
 };
 
+// Update the hover info type
+interface HoverInfo {
+  object: any;
+  x: number;
+  y: number;
+  type: "point" | "hexagon" | "suggested";
+}
+
 function MapComponent() {
   const dispatch = useDispatch();
   const datasets = useSelector((state: RootState) => state.map.datasets);
-  const hoverInfo = useSelector((state: RootState) => state.map.hoverInfo);
   const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
   const showIsochrones = useSelector(
     (state: RootState) => state.map.showIsochrones
   );
-  const [isochrones, setIsochrones] = useState<IsochroneData[]>([]);
-  const [progress, setProgress] = useState(0);
   const suggestedHubs = useSelector(
     (state: RootState) => state.map.suggestedHubs
   );
+
+  // Remove the redux hover info and use local state
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const [isochrones, setIsochrones] = useState<IsochroneData[]>([]);
+  const [progress, setProgress] = useState(0);
   const [isochronesCalculated, setIsochronesCalculated] = useState(false);
   const [isochroneLayers, setIsochroneLayers] = useState<any[]>([]);
+  const [heatmapData, setHeatmapData] = useState<[number, number][]>([]);
+
+  // Update the tooltip handler
+  const getTooltip = (info: PickingInfo) => {
+    const { object, x, y } = info;
+
+    if (!object) {
+      return null;
+    }
+
+    // Set hover info based on layer type
+    if (object.points) {
+      setHoverInfo({ object, x, y, type: "hexagon" });
+      return `Count: ${object.points.length}`;
+    } else if (object.properties) {
+      setHoverInfo({ object, x, y, type: "point" });
+      return Object.entries(object.properties)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join("\n");
+    }
+    return null;
+  };
 
   // Fix useEffect dependencies
   useEffect(() => {
@@ -172,6 +215,14 @@ function MapComponent() {
     }
   }, [showIsochrones, datasets, dispatch, timeLimit]);
 
+  useEffect(() => {
+    const transformedData = suggestedHubs?.map((hub) => [
+      hub.longitude,
+      hub.latitude,
+    ]);
+    setHeatmapData(transformedData);
+  }, [suggestedHubs]);
+
   const layers = [
     ...datasets
       .filter((dataset) => dataset.visible)
@@ -183,41 +234,74 @@ function MapComponent() {
           getRadius: 100,
           getFillColor: [...dataset.color, 200],
           pickable: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onHover: (info: any) => {
-            dispatch(setHoverInfo(info.object ? info : null));
-          },
+        }),
+        new GeoJsonLayer({
+          id: `coverage-layer-${dataset.id}`,
+          data: dataset.data
+            .filter((d: DataPoint) => d.coverage)
+            .map((d: DataPoint) => ({
+              type: "Feature",
+              geometry: d.coverage,
+              properties: {},
+            })),
+          getFillColor: [...dataset.color, 50],
+          getLineColor: dataset.strokedColor,
+          getLineWidth: 2,
+          pickable: false,
         }),
       ]),
     ...(isochronesCalculated ? isochroneLayers : []),
     ...(suggestedHubs
       ? [
-          // Points layer for suggested hubs
           new ScatterplotLayer({
             id: "suggested-hubs-points",
             data: suggestedHubs,
             getPosition: (d) => [d.longitude, d.latitude],
             getRadius: 150,
-            getFillColor: [83, 19, 30, 200], // Green color for suggested hubs
+            getFillColor: [83, 19, 30, 200],
             pickable: true,
-            onHover: (info: any) => {
-              dispatch(setHoverInfo(info.object ? info : null));
-            },
           }),
-          // Coverage polygons layer
           new GeoJsonLayer({
             id: "suggested-hubs-coverage",
             data: suggestedHubs.map((hub) => ({
               type: "Feature",
               geometry: JSON.parse(hub.coverage),
-              properties: {}, // Optional metadata
+              properties: {},
             })),
-            getFillColor: [83, 19, 30, 80], // Transparent green
+            getFillColor: [83, 19, 30, 80],
             getLineColor: [83, 19, 30, 200],
             getLineWidth: 4,
           }),
         ]
       : []),
+    new HexagonLayer({
+      id: "heatmap",
+      data: heatmapData,
+      getPosition: (d) => d,
+      radius: 1000,
+      elevationScale: 50,
+      pickable: true,
+      extruded: true,
+      colorRange: [
+        [1, 152, 189],
+        [73, 227, 206],
+        [216, 254, 181],
+        [254, 237, 177],
+        [254, 173, 84],
+        [209, 55, 78],
+      ],
+      coverage: 1,
+      upperPercentile: 100,
+      material: {
+        ambient: 0.64,
+        diffuse: 0.6,
+        shininess: 32,
+        specularColor: [51, 51, 51],
+      },
+      transitions: {
+        elevationScale: 3000,
+      },
+    }),
   ];
 
   return (
@@ -226,6 +310,7 @@ function MapComponent() {
         initialViewState={INITIAL_VIEW_STATE}
         controller={true}
         layers={layers}
+        getTooltip={getTooltip}
       >
         <Map
           initialViewState={{
@@ -265,11 +350,17 @@ function MapComponent() {
           className="absolute z-10 pointer-events-none bg-white p-2 md:p-4 rounded-lg shadow-md text-sm md:text-base"
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
         >
-          {Object.entries(hoverInfo.object?.properties || {}).map(
-            ([key, value]) => (
-              <div key={key}>
-                <strong>{key}:</strong> {String(value)}
-              </div>
+          {hoverInfo.type === "hexagon" ? (
+            <div>
+              <strong>Count:</strong> {hoverInfo.object.points.length}
+            </div>
+          ) : (
+            Object.entries(hoverInfo.object?.properties || {}).map(
+              ([key, value]) => (
+                <div key={key}>
+                  <strong>{key}:</strong> {String(value)}
+                </div>
+              )
             )
           )}
         </div>
