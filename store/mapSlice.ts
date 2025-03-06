@@ -31,6 +31,7 @@ interface MapState {
   timeLimit: number; // Add timeLimit to the state
   showIsochrones: boolean; // Add this property
   suggestedHubs: SuggestedHub[] | null;
+  populationLayerVisible: boolean;
 }
 
 const initialState: MapState = {
@@ -40,6 +41,7 @@ const initialState: MapState = {
   timeLimit: 10, // Default time limit in minutes
   showIsochrones: false, // Add initial value
   suggestedHubs: null,
+  populationLayerVisible: true,
 };
 
 const mapSlice = createSlice({
@@ -108,6 +110,9 @@ const mapSlice = createSlice({
     setSuggestedHubs: (state, action: PayloadAction<SuggestedHub[]>) => {
       state.suggestedHubs = action.payload;
     },
+    togglePopulationLayer: (state) => {
+      state.populationLayerVisible = !state.populationLayerVisible;
+    },
   },
 });
 
@@ -123,5 +128,6 @@ export const {
   resetIsochrones,
   updateDatasetWithDownloadable,
   setSuggestedHubs,
+  togglePopulationLayer,
 } = mapSlice.actions;
 export default mapSlice.reducer;

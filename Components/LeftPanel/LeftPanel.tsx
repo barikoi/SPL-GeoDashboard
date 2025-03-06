@@ -10,6 +10,7 @@ import {
   showIsochrones,
   updateDatasetWithDownloadable,
   setSuggestedHubs,
+  togglePopulationLayer,
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -38,14 +39,14 @@ interface DataPoint {
 // Helper function to generate random colors
 const getRandomColor = (): [number, number, number] => {
   const colors: [number, number, number][] = [
-    [255, 0, 0],
-    [0, 255, 0],
-    [0, 0, 255],
-    [255, 165, 0],
-    [128, 0, 128],
-    [0, 128, 128],
-    [255, 192, 203],
-    [165, 42, 42],
+    [139, 0, 0], // Dark Red
+    [0, 100, 0], // Dark Green
+    [0, 0, 139], // Dark Blue
+    [255, 140, 0], // Dark Orange
+    [75, 0, 130], // Indigo
+    [47, 79, 79], // Dark Slate Gray
+    [105, 105, 105], // Dim Gray
+    [85, 107, 47], // Dark Olive Green
   ];
   return colors[Math.floor(Math.random() * colors.length)];
 };
@@ -150,6 +151,9 @@ const LeftPanel = () => {
   const [hasCoverageColumn, setHasCoverageColumn] = useState<boolean>(false);
   const [processedHubFile, setProcessedHubFile] = useState<File | null>(null);
   const [showCoverageError, setShowCoverageError] = useState<boolean>(false);
+  const populationLayerVisible = useSelector(
+    (state: RootState) => state.map.populationLayerVisible
+  );
 
   const checkForCoverageColumn = (data: any[]): boolean => {
     if (!data || data.length === 0) return false;
@@ -158,70 +162,76 @@ const LeftPanel = () => {
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      setFileUploaded(true);
-      const file = files[0];
-      setHubLocationFile(file);
+    if (!files || !files[0]) {
+      setFileUploaded(false);
+      setHubLocationFile(null);
       setShowCoverageError(false);
       setProcessedHubFile(null);
-
-      const reader = new FileReader();
-      reader.onload = async (e: ProgressEvent<FileReader>) => {
-        if (e.target?.result) {
-          const content = e.target.result as string;
-          const id = `dataset-${Date.now()}`;
-          const color = getRandomColor();
-          const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [
-            number,
-            number,
-            number
-          ];
-
-          if (file.name.endsWith(".csv")) {
-            Papa.parse(content, {
-              header: true,
-              dynamicTyping: true,
-              complete: (result) => {
-                const hasCoverage = checkForCoverageColumn(result.data);
-                setHasCoverageColumn(hasCoverage);
-                if (!hasCoverage) {
-                  setShowCoverageError(true);
-                }
-                const normalizedData = normalizeData(result.data, "csv");
-                dispatch(
-                  addDataset({
-                    id,
-                    name: file.name,
-                    data: normalizedData,
-                    visible: true,
-                    color,
-                    strokedColor,
-                    originalFile: result.data,
-                  })
-                );
-              },
-            });
-          } else if (file.name.endsWith(".json")) {
-            const jsonData = JSON.parse(content);
-            setHasCoverageColumn(false);
-            setShowCoverageError(true);
-            const normalizedData = normalizeData(jsonData, "json");
-            dispatch(
-              addDataset({
-                id,
-                name: file.name,
-                data: normalizedData,
-                visible: true,
-                color,
-                strokedColor,
-                originalFile: jsonData,
-              })
-            );
-          }
-        }
-      };
-      reader?.readAsText(file);
+      return;
     }
+
+    setFileUploaded(true);
+    const file = files[0];
+    setHubLocationFile(file);
+    setShowCoverageError(false);
+    setProcessedHubFile(null);
+
+    const reader = new FileReader();
+    reader.onload = async (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        const content = e.target.result as string;
+        const id = `dataset-${Date.now()}`;
+        const color = getRandomColor();
+        const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [
+          number,
+          number,
+          number
+        ];
+
+        if (file.name.endsWith(".csv")) {
+          Papa.parse(content, {
+            header: true,
+            dynamicTyping: true,
+            complete: (result) => {
+              const hasCoverage = checkForCoverageColumn(result.data);
+              setHasCoverageColumn(hasCoverage);
+              if (!hasCoverage) {
+                setShowCoverageError(true);
+              }
+              const normalizedData = normalizeData(result.data, "csv");
+              dispatch(
+                addDataset({
+                  id,
+                  name: file.name,
+                  data: normalizedData,
+                  visible: true,
+                  color,
+                  strokedColor,
+                  originalFile: result.data,
+                })
+              );
+            },
+          });
+        } else if (file.name.endsWith(".json")) {
+          const jsonData = JSON.parse(content);
+          setHasCoverageColumn(false);
+          setShowCoverageError(true);
+          const normalizedData = normalizeData(jsonData, "json");
+          dispatch(
+            addDataset({
+              id,
+              name: file.name,
+              data: normalizedData,
+              visible: true,
+              color,
+              strokedColor,
+              originalFile: jsonData,
+            })
+          );
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleProcessedHubFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -252,6 +262,14 @@ const LeftPanel = () => {
 
   const handleDeleteDataset = (id: string) => {
     dispatch(removeDataset(id));
+    // Check if there are any remaining datasets
+    const remainingDatasets = datasets.filter((d) => d.id !== id);
+    if (remainingDatasets.length === 0) {
+      setFileUploaded(false);
+      setHubLocationFile(null);
+      setShowCoverageError(false);
+      setProcessedHubFile(null);
+    }
   };
 
   const handlePopulationUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -263,8 +281,44 @@ const LeftPanel = () => {
       return;
     }
 
-    setPopulationFile(file);
-    message.success("Population file selected successfully.");
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        Papa.parse(e.target.result as string, {
+          header: true,
+          complete: (results) => {
+            console.log("Population Data:", {
+              data: results.data,
+              totalRows: results.data.length,
+              fields: results.meta.fields,
+            });
+
+            // Validate data structure
+            const sampleRow = results.data[0];
+            console.log("Sample Row:", sampleRow);
+
+            if (!sampleRow?.Latitude || !sampleRow?.Longitude) {
+              message.error("File must contain Latitude and Longitude columns");
+              return;
+            }
+
+            // Dispatch population data to MapComponent
+            const event = new CustomEvent("populationData", {
+              detail: results.data,
+            });
+            window.dispatchEvent(event);
+
+            setPopulationFile(file);
+            message.success("Population file loaded successfully");
+          },
+          error: (error) => {
+            console.error("Error parsing population file:", error);
+            message.error("Failed to parse population file");
+          },
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleCalculatePopulation = async () => {
@@ -386,6 +440,7 @@ const LeftPanel = () => {
 
       if (data.message === "success") {
         dispatch(setSuggestedHubs(data.suggested_hubs));
+        dispatch(togglePopulationLayer(false));
         setSuggestedHubsCount(data.suggested_hubs.length);
         message.success("Successfully loaded suggested hubs");
       }
@@ -448,16 +503,9 @@ const LeftPanel = () => {
             />
           </>
         )}
-      </div>
 
-      {/* Step 2: More compact dataset list and controls */}
-      {fileUploaded && !hasCoverageColumn && (
-        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
-          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
-            Step 2: Calculate Walkable Coverage
-          </h2>
-
-          {/* Dataset list with download options */}
+        {/* Dataset list with download options */}
+        {fileUploaded && (
           <div className="mb-3">
             <h3 className="text-xs font-medium mb-1.5 text-gray-600">
               Uploaded Datasets:
@@ -522,6 +570,15 @@ const LeftPanel = () => {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Step 2: More compact dataset list and controls */}
+      {fileUploaded && !hasCoverageColumn && (
+        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
+            Step 2: Calculate Walkable Coverage
+          </h2>
 
           {/* Walking time input and calculate button */}
           <div className="mb-2">
@@ -593,6 +650,32 @@ const LeftPanel = () => {
               </div>
             )}
           </div>
+
+          {populationFile && (
+            <div className="flex items-center justify-between mt-2 mb-2 p-1.5 bg-gray-50 rounded-lg">
+              <div className="flex items-center">
+                <button
+                  onClick={() => dispatch(togglePopulationLayer())}
+                  className="mr-2 text-gray-500 hover:text-blue-500 transition-colors"
+                >
+                  {populationLayerVisible ? (
+                    <FaEye size={14} />
+                  ) : (
+                    <FaEyeSlash size={14} />
+                  )}
+                </button>
+                <div
+                  className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: "rgb(139, 95, 191)",
+                  }}
+                />
+                <span className="text-xs font-medium text-gray-700">
+                  Population Density
+                </span>
+              </div>
+            </div>
+          )}
 
           {hubLocationFile && populationFile && (
             <button

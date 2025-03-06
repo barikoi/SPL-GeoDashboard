@@ -7,16 +7,12 @@ import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
-import {
-  setHoverInfo,
-  updateDatasetWithIsochrones,
-  resetIsochrones,
-} from "@/store/mapSlice";
+import { updateDatasetWithIsochrones, resetIsochrones } from "@/store/mapSlice";
 import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
-import { PickingInfo } from "@deck.gl/core/typed";
+import { PickingInfo } from "@deck.gl/core";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.6364439,
@@ -45,6 +41,13 @@ interface DataPoint {
   properties: Record<string, unknown>;
   geojson: string;
   coverage?: any; // Coverage polygon data
+}
+
+// Add this interface at the top with other interfaces
+interface PopulationPoint {
+  Latitude: number;
+  Longitude: number;
+  CityNameEn: string;
 }
 
 // Helper function to transform isochrone data to GeoJSON
@@ -80,6 +83,9 @@ function MapComponent() {
   const suggestedHubs = useSelector(
     (state: RootState) => state.map.suggestedHubs
   );
+  const populationLayerVisible = useSelector(
+    (state: RootState) => state.map.populationLayerVisible
+  );
 
   // Remove the redux hover info and use local state
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -87,25 +93,38 @@ function MapComponent() {
   const [progress, setProgress] = useState(0);
   const [isochronesCalculated, setIsochronesCalculated] = useState(false);
   const [isochroneLayers, setIsochroneLayers] = useState<any[]>([]);
-  const [heatmapData, setHeatmapData] = useState<[number, number][]>([]);
+  const [populationPoints, setPopulationPoints] = useState<[number, number][]>(
+    []
+  );
 
   // Update the tooltip handler
   const getTooltip = (info: PickingInfo) => {
     const { object, x, y } = info;
 
     if (!object) {
+      setHoverInfo(null);
       return null;
     }
 
-    // Set hover info based on layer type
-    if (object.points) {
+    if (object.points && info.layer.id === "population-hexagon") {
       setHoverInfo({ object, x, y, type: "hexagon" });
-      return `Count: ${object.points.length}`;
+      return `
+        Population Density
+        Count: ${object.points.length} points
+      `;
     } else if (object.properties) {
-      setHoverInfo({ object, x, y, type: "point" });
-      return Object.entries(object.properties)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join("\n");
+      // For point layers, only show the dataset name
+      const datasetName =
+        datasets.find((d) => d.data.some((point) => point === object))?.name ||
+        "Unknown Dataset";
+
+      setHoverInfo({
+        object: { properties: { name: datasetName } },
+        x,
+        y,
+        type: "point",
+      });
+      return datasetName;
     }
     return null;
   };
@@ -191,7 +210,7 @@ function MapComponent() {
                         })),
                       getFillColor: [...dataset.color, 100],
                       getLineColor: dataset.strokedColor,
-                      getLineWidth: 2,
+                      getLineWidth: 3,
                     }),
                   ]
                 : []
@@ -215,13 +234,29 @@ function MapComponent() {
     }
   }, [showIsochrones, datasets, dispatch, timeLimit]);
 
+  // Add useEffect to listen for population file changes
   useEffect(() => {
-    const transformedData = suggestedHubs?.map((hub) => [
-      hub.longitude,
-      hub.latitude,
-    ]);
-    setHeatmapData(transformedData);
-  }, [suggestedHubs]);
+    const handlePopulationData = (data: PopulationPoint[]) => {
+      const points = data
+        .filter((row) => row.Latitude && row.Longitude)
+        .map((row) => [
+          parseFloat(String(row.Longitude)),
+          parseFloat(String(row.Latitude)),
+        ]);
+      setPopulationPoints(points);
+    };
+
+    // Subscribe to population data updates
+    window.addEventListener("populationData", ((e: CustomEvent) => {
+      handlePopulationData(e.detail);
+    }) as EventListener);
+
+    return () => {
+      window.removeEventListener("populationData", ((e: CustomEvent) => {
+        handlePopulationData(e.detail);
+      }) as EventListener);
+    };
+  }, []);
 
   const layers = [
     ...datasets
@@ -244,9 +279,9 @@ function MapComponent() {
               geometry: d.coverage,
               properties: {},
             })),
-          getFillColor: [...dataset.color, 50],
+          getFillColor: [...dataset.color, 100],
           getLineColor: dataset.strokedColor,
-          getLineWidth: 2,
+          getLineWidth: 3,
           pickable: false,
         }),
       ]),
@@ -274,35 +309,52 @@ function MapComponent() {
           }),
         ]
       : []),
-    new HexagonLayer({
-      id: "heatmap",
-      data: heatmapData,
-      getPosition: (d) => d,
-      radius: 1000,
-      elevationScale: 50,
-      pickable: true,
-      extruded: true,
-      colorRange: [
-        [1, 152, 189],
-        [73, 227, 206],
-        [216, 254, 181],
-        [254, 237, 177],
-        [254, 173, 84],
-        [209, 55, 78],
-      ],
-      coverage: 1,
-      upperPercentile: 100,
-      material: {
-        ambient: 0.64,
-        diffuse: 0.6,
-        shininess: 32,
-        specularColor: [51, 51, 51],
-      },
-      transitions: {
-        elevationScale: 3000,
-      },
-    }),
-  ];
+    populationLayerVisible &&
+      // Only show population layer if no suggested hubs
+      new HexagonLayer({
+        id: "population-hexagon",
+        data: populationPoints,
+        getPosition: (d) => d,
+        radius: 500,
+        elevationScale: 20,
+        pickable: true,
+        extruded: true,
+        colorRange: [
+          [237, 248, 125], // Light Yellow (Low population)
+          [254, 192, 206], // Light Teal
+          [227, 135, 158], // Teal
+          [209, 131, 201], // Medium Dark Blue
+          [139, 95, 191], // Dark Blue
+          [100, 58, 113], // Very Dark Blue (High population)
+        ],
+
+        coverage: 1,
+        upperPercentile: 100,
+        material: {
+          ambient: 0.64,
+          diffuse: 0.6,
+          shininess: 32,
+          specularColor: [51, 51, 51],
+        },
+        transitions: {
+          elevationScale: 500,
+        },
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 100],
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: info.object,
+              x: info.x,
+              y: info.y,
+              type: "hexagon",
+            });
+          } else {
+            setHoverInfo(null); // Clear hover info when not hovering
+          }
+        },
+      }),
+  ].filter(Boolean);
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
@@ -351,17 +403,18 @@ function MapComponent() {
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
         >
           {hoverInfo.type === "hexagon" ? (
-            <div>
-              <strong>Count:</strong> {hoverInfo.object.points.length}
+            <div className="space-y-1">
+              <div className="font-semibold text-gray-800">
+                Population Density
+              </div>
+              <div>
+                <strong>Count:</strong> {hoverInfo.object.count} points
+              </div>
             </div>
           ) : (
-            Object.entries(hoverInfo.object?.properties || {}).map(
-              ([key, value]) => (
-                <div key={key}>
-                  <strong>{key}:</strong> {String(value)}
-                </div>
-              )
-            )
+            <div className="font-medium text-gray-800">
+              {hoverInfo.object?.properties?.name}
+            </div>
           )}
         </div>
       )}
