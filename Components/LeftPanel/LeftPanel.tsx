@@ -31,6 +31,7 @@ interface DataPoint {
   longitude: number;
   properties: Record<string, unknown>;
   geojson: string;
+  isochrones?: unknown;
 }
 
 // Helper function to generate random colors
@@ -50,34 +51,35 @@ const getRandomColor = (): [number, number, number] => {
 
 // Update the normalizeData function with proper types
 const normalizeData = (
-  data: Record<string, unknown>[],
+  data: Record<string, any>[],
   fileType: "csv" | "json"
 ): DataPoint[] => {
   if (fileType === "csv") {
     return data.map((row) => ({
-      latitude: parseFloat(row.latitude),
-      longitude: parseFloat(row.longitude),
+      latitude: parseFloat(String(row.latitude)),
+      longitude: parseFloat(String(row.longitude)),
       properties: { ...row },
       geojson: JSON.stringify({
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [parseFloat(row.longitude), parseFloat(row.latitude)],
+          coordinates: [
+            parseFloat(String(row.longitude)),
+            parseFloat(String(row.latitude)),
+          ],
         },
         properties: { ...row },
       }),
     }));
   } else if (fileType === "json") {
-    if (data?.features) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data?.features.map((feature: any) => ({
+    if ("features" in data) {
+      return data.features.map((feature: any) => ({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
         properties: feature.properties,
         geojson: JSON.stringify(feature),
       }));
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((item: any) => ({
         latitude: item.latitude,
         longitude: item.longitude,
@@ -129,66 +131,111 @@ const LeftPanel = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [hubLocationFile, setHubLocationFile] = useState<File | null>(null);
   const [populationFile, setPopulationFile] = useState<File | null>(null);
+  const [suggestedHubsCount, setSuggestedHubsCount] = useState<number | null>(
+    null
+  );
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [hasCoverageColumn, setHasCoverageColumn] = useState<boolean>(false);
+  const [processedHubFile, setProcessedHubFile] = useState<File | null>(null);
+  const [showCoverageError, setShowCoverageError] = useState<boolean>(false);
+
+  const checkForCoverageColumn = (data: any[]): boolean => {
+    if (!data || data.length === 0) return false;
+    return Object.keys(data[0]).some((key) => key.toLowerCase() === "coverage");
+  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       setFileUploaded(true);
-      setHubLocationFile(files[0]);
+      const file = files[0];
+      setHubLocationFile(file);
+      setShowCoverageError(false);
+      setProcessedHubFile(null);
 
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = async (e: ProgressEvent<FileReader>) => {
-          if (e.target?.result) {
-            const content = e.target.result as string;
-            const id = `dataset-${Date.now()}`;
-            const color = getRandomColor();
-            const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [
-              number,
-              number,
-              number
-            ];
+      const reader = new FileReader();
+      reader.onload = async (e: ProgressEvent<FileReader>) => {
+        if (e.target?.result) {
+          const content = e.target.result as string;
+          const id = `dataset-${Date.now()}`;
+          const color = getRandomColor();
+          const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [
+            number,
+            number,
+            number
+          ];
 
-            // Only process file for visualization, don't upload to API yet
-            if (file.name.endsWith(".json")) {
-              const jsonData = JSON.parse(content);
-              const normalizedData = normalizeData(jsonData, "json");
-              dispatch(
-                addDataset({
-                  id,
-                  name: file.name,
-                  data: normalizedData,
-                  visible: true,
-                  color,
-                  strokedColor,
-                  originalFile: jsonData,
-                })
-              );
-            } else if (file.name.endsWith(".csv")) {
-              Papa.parse(content, {
-                header: true,
-                dynamicTyping: true,
-                complete: (result) => {
-                  const normalizedData = normalizeData(result.data, "csv");
-                  dispatch(
-                    addDataset({
-                      id,
-                      name: file.name,
-                      data: normalizedData,
-                      visible: true,
-                      color,
-                      strokedColor,
-                      originalFile: result.data,
-                    })
-                  );
-                },
-              });
-            }
+          if (file.name.endsWith(".csv")) {
+            Papa.parse(content, {
+              header: true,
+              dynamicTyping: true,
+              complete: (result) => {
+                const hasCoverage = checkForCoverageColumn(result.data);
+                setHasCoverageColumn(hasCoverage);
+                if (!hasCoverage) {
+                  setShowCoverageError(true);
+                }
+                const normalizedData = normalizeData(result.data, "csv");
+                dispatch(
+                  addDataset({
+                    id,
+                    name: file.name,
+                    data: normalizedData,
+                    visible: true,
+                    color,
+                    strokedColor,
+                    originalFile: result.data,
+                  })
+                );
+              },
+            });
+          } else if (file.name.endsWith(".json")) {
+            const jsonData = JSON.parse(content);
+            setHasCoverageColumn(false);
+            setShowCoverageError(true);
+            const normalizedData = normalizeData(jsonData, "json");
+            dispatch(
+              addDataset({
+                id,
+                name: file.name,
+                data: normalizedData,
+                visible: true,
+                color,
+                strokedColor,
+                originalFile: jsonData,
+              })
+            );
           }
-        };
-        reader.readAsText(file);
-      });
+        }
+      };
+      reader.readAsText(file);
     }
+  };
+
+  const handleProcessedHubFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        Papa.parse(e.target.result as string, {
+          header: true,
+          complete: (result) => {
+            const hasCoverage = checkForCoverageColumn(result.data);
+            if (hasCoverage) {
+              setProcessedHubFile(file);
+              setShowCoverageError(false);
+              message.success("Valid processed hub file uploaded");
+            } else {
+              setProcessedHubFile(null);
+              message.error("This file does not contain coverage data");
+            }
+          },
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleDeleteDataset = (id: string) => {
@@ -209,8 +256,17 @@ const LeftPanel = () => {
   };
 
   const handleCalculatePopulation = async () => {
-    if (!hubLocationFile || !populationFile) {
+    const fileToUse = processedHubFile || hubLocationFile;
+
+    if (!fileToUse || !populationFile) {
       message.error("Please upload both hub locations and population files.");
+      return;
+    }
+
+    if (!hasCoverageColumn && !processedHubFile) {
+      message.error(
+        "Please calculate walkable coverage first and upload the processed file."
+      );
       return;
     }
 
@@ -218,9 +274,9 @@ const LeftPanel = () => {
     setUploadProgress(0);
 
     try {
-      // First upload hub locations
+      // Upload hub locations
       const hubFormData = new FormData();
-      hubFormData.append("file", hubLocationFile);
+      hubFormData.append("file", fileToUse);
 
       const hubResponse = await fetch(
         "http://202.72.236.166:8000/upload_hub_locations/",
@@ -300,6 +356,7 @@ const LeftPanel = () => {
   };
 
   const handleGetSuggestedHubs = async () => {
+    setIsLoadingSuggestions(true);
     try {
       const response = await fetch(
         "http://202.72.236.166:8000/suggested_hubs/",
@@ -314,13 +371,18 @@ const LeftPanel = () => {
       if (!response.ok) throw new Error("Failed to get suggested hubs");
 
       const data = await response.json();
+
       if (data.message === "success") {
         dispatch(setSuggestedHubs(data.suggested_hubs));
+        setSuggestedHubsCount(data.suggested_hubs.length);
         message.success("Successfully loaded suggested hubs");
       }
     } catch (error) {
       console.error("Error getting suggested hubs:", error);
       message.error("Failed to get suggested hubs");
+      setSuggestedHubsCount(null);
+    } finally {
+      setIsLoadingSuggestions(false);
     }
   };
 
@@ -329,20 +391,20 @@ const LeftPanel = () => {
 
   return (
     <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-4 md:p-6 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
-      <div className="flex items-center mb-4 md:mb-8">
+      <div className="flex items-center mb-3">
         <Image
           src={SPL}
           alt="SPL Logo"
-          width={60}
+          width={40}
           height={0}
-          className="w-12 md:w-[60px] rounded-lg shadow-md"
+          className="w-8 md:w-[40px] rounded-lg shadow-md"
         />
-        <h1 className="text-xl md:text-2xl font-bold ml-3 text-gray-900">
+        <h1 className="text-lg md:text-xl font-bold ml-2 text-gray-900">
           GeoDashboard
         </h1>
       </div>
 
-      <h2 className="text-md md:text-lg font-semibold mb-4 md:mb-6 text-gray-700">
+      <h2 className="text-sm md:text-base font-semibold mb-3 text-gray-700">
         Upload Hub Locations (JSON or CSV)
       </h2>
 
@@ -350,18 +412,17 @@ const LeftPanel = () => {
         type="file"
         accept=".json,.csv"
         onChange={handleFileChange}
-        multiple
-        className="w-full p-2 md:p-3 border-2 border-dashed border-gray-300 rounded-lg mb-4 md:mb-6 bg-white hover:border-blue-500 transition-colors cursor-pointer"
+        className="w-full p-2 border-2 border-dashed border-gray-300 rounded-lg mb-3 bg-white hover:border-blue-500 transition-colors cursor-pointer text-sm"
       />
 
       <div className="mb-4 md:mb-6">
-        <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 text-gray-700">
+        <h3 className="text-sm md:text-base font-medium mb-2 text-gray-700">
           Uploaded Datasets
         </h3>
         {datasets.map((dataset) => (
           <div
             key={dataset.id}
-            className="flex items-center justify-between mb-2 md:mb-3 p-2 md:p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+            className="flex items-center justify-between mb-2 p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center">
               <button
@@ -429,23 +490,47 @@ const LeftPanel = () => {
             </label>
           </div>
           <button
-            className="w-full py-2 md:py-3 px-4 md:px-6 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm text-sm md:text-base flex items-center justify-center"
+            className="w-full py-2 px-4 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm text-sm flex items-center justify-center"
             onClick={() => dispatch(showIsochrones())}
           >
             Calculate Walkable Coverage
             <Tooltip title="Calculate the area that can be reached on foot from each point shown on the map">
-              <FaInfoCircle className="ml-2 text-white" />
+              <FaInfoCircle className="ml-2 text-white text-xs" />
             </Tooltip>
           </button>
+        </div>
+      )}
+
+      {showCoverageError && (
+        <div className="mb-4 mt-4">
+          <div className="p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg mb-2 text-sm">
+            This file doesn't contain coverage data. Please calculate walkable
+            coverage first and download the processed file and upload it below.
+          </div>
+
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleProcessedHubFile}
+            className="w-full p-2 border-2 border-dashed border-red-500 rounded-lg bg-white hover:border-blue-500 transition-colors cursor-pointer text-sm"
+          />
         </div>
       )}
 
       {/* Change the condition here */}
       {showPopulationSection && (
         <div className="mb-4 mt-4 md:mb-6">
-          <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 text-gray-700">
+          <h3 className="text-sm md:text-base font-medium mb-2 text-gray-700">
             Population Coverage Analysis
           </h3>
+
+          {showCoverageError && !processedHubFile && (
+            <div className="p-2 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-2 text-sm">
+              Please calculate walkable coverage and upload the processed file
+              to proceed
+            </div>
+          )}
+
           <div className="flex items-center space-x-2">
             <input
               type="file"
@@ -457,7 +542,7 @@ const LeftPanel = () => {
             />
             <label
               htmlFor="population-upload"
-              className={`flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors cursor-pointer ${
+              className={`flex items-center px-3 py-1.5 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors cursor-pointer ${
                 isCalculating ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
@@ -474,18 +559,24 @@ const LeftPanel = () => {
           {hubLocationFile && populationFile && (
             <button
               onClick={handleCalculatePopulation}
-              disabled={isCalculating}
-              className={`w-full mt-6 py-3 md:py-4 px-6 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
-                isCalculating ? "opacity-50 cursor-not-allowed" : ""
+              disabled={
+                isCalculating || (showCoverageError && !processedHubFile)
+              }
+              className={`w-full mt-4 py-2 px-4 bg-blue-600 text-white text-base font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
+                isCalculating || (showCoverageError && !processedHubFile)
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
               }`}
             >
               {isCalculating ? (
-                <div className="flex items-center justify-center text-base">
+                <div className="flex items-center justify-center text-sm">
                   <Spin className="mr-2" size="small" />
                   Calculating...
                 </div>
+              ) : showCoverageError && !processedHubFile ? (
+                "Upload Processed File to Continue"
               ) : (
-                <>Calculate Population Coverage</>
+                "Calculate Population Coverage"
               )}
             </button>
           )}
@@ -503,16 +594,28 @@ const LeftPanel = () => {
       )}
 
       {/* Change this condition too */}
-      {datasets.some(
-        (dataset) => dataset.downloadableData && dataset.visible
-      ) && (
-        <div className="mt-4">
+      {datasets.some((dataset) => dataset.visible) && (
+        <div className="mt-4 space-y-1.5">
           <button
             onClick={handleGetSuggestedHubs}
-            className="w-full py-3 px-6 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner"
+            disabled={isLoadingSuggestions}
+            className={`w-full py-2 px-4 bg-green-600 text-white text-base font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl active:shadow-inner ${
+              isLoadingSuggestions ? "opacity-75 cursor-not-allowed" : ""
+            }`}
           >
-            Get Suggested Hubs
+            <div className="flex items-center justify-center space-x-2">
+              <span>Get Suggested Hubs</span>
+              {isLoadingSuggestions && <Spin size="small" />}
+            </div>
           </button>
+          {suggestedHubsCount !== null && (
+            <div className="text-center p-1.5 bg-gray-100 rounded-lg">
+              <span className="font-medium text-sm">
+                Found {suggestedHubsCount} suggested hub
+                {suggestedHubsCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

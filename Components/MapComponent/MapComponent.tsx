@@ -16,43 +16,6 @@ import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
 
-// // Add proper types for the tooltip props
-// interface TooltipProps {
-//   hoveredObject: {
-//     properties: Record<string, unknown>;
-//   } | null;
-//   x: number;
-//   y: number;
-// }
-
-// const Tooltip = ({ hoveredObject, x, y }: TooltipProps) => {
-//   if (!hoveredObject) return null;
-
-//   return (
-//     <div
-//       style={{
-//         position: "absolute",
-//         zIndex: 1,
-//         pointerEvents: "none",
-//         left: x,
-//         top: y,
-//         backgroundColor: "white",
-//         padding: "8px",
-//         borderRadius: "4px",
-//         boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
-//       }}
-//     >
-//       <div>
-//         {Object.entries(hoveredObject.properties || {}).map(([key, value]) => (
-//           <div key={key}>
-//             <strong>{key}:</strong> {String(value)}
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// };
-
 const INITIAL_VIEW_STATE = {
   longitude: 46.6364439,
   latitude: 24.8335129,
