@@ -96,7 +96,11 @@ function MapComponent() {
   const [populationPoints, setPopulationPoints] = useState<[number, number][]>(
     []
   );
+  const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
 
+  const mapStyle = isNightMode
+    ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
+    : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
   // Update the tooltip handler
   const getTooltip = (info: PickingInfo) => {
     const { object, x, y } = info;
@@ -371,7 +375,7 @@ function MapComponent() {
             zoom: 14,
           }}
           style={{ width: "100%", height: "100%" }}
-          mapStyle={`https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`}
+          mapStyle={mapStyle}
           attributionControl={false}
         >
           <AttributionControl customAttribution="Barikoi" />

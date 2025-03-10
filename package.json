@@ -23,7 +23,8 @@
     "react-dom": "^18",
     "react-icons": "^5.5.0",
     "react-map-gl": "^8.0.1",
-    "react-redux": "^9.2.0"
+    "react-redux": "^9.2.0",
+    "serve": "^14.2.4"
   },
   "devDependencies": {
     "@types/node": "^20",

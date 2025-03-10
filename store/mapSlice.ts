@@ -32,6 +32,7 @@ interface MapState {
   showIsochrones: boolean; // Add this property
   suggestedHubs: SuggestedHub[] | null;
   populationLayerVisible: boolean;
+  isNightMode: boolean;
 }
 
 const initialState: MapState = {
@@ -42,6 +43,7 @@ const initialState: MapState = {
   showIsochrones: false, // Add initial value
   suggestedHubs: null,
   populationLayerVisible: true,
+  isNightMode: false,
 };
 
 const mapSlice = createSlice({
@@ -113,6 +115,9 @@ const mapSlice = createSlice({
     togglePopulationLayer: (state) => {
       state.populationLayerVisible = !state.populationLayerVisible;
     },
+    toggleNightMode: (state) => {
+      state.isNightMode = !state.isNightMode; // Toggle night mode
+    },
   },
 });
 
@@ -129,5 +134,6 @@ export const {
   updateDatasetWithDownloadable,
   setSuggestedHubs,
   togglePopulationLayer,
+  toggleNightMode,
 } = mapSlice.actions;
 export default mapSlice.reducer;

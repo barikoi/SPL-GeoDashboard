@@ -11,6 +11,7 @@ import {
   updateDatasetWithDownloadable,
   setSuggestedHubs,
   togglePopulationLayer,
+  toggleNightMode,
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -25,7 +26,7 @@ import Image from "next/image";
 import SPL from "./SPL_Logo.webp";
 import { Progress, message, Spin, Tooltip } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-
+import { Switch } from "antd";
 // Add proper types for the data
 interface DataPoint {
   latitude: number;
@@ -151,6 +152,13 @@ const LeftPanel = () => {
   const [hasCoverageColumn, setHasCoverageColumn] = useState<boolean>(false);
   const [processedHubFile, setProcessedHubFile] = useState<File | null>(null);
   const [showCoverageError, setShowCoverageError] = useState<boolean>(false);
+
+  const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
+
+  const handleToggleMapStyle = (checked: boolean) => {
+    dispatch(toggleNightMode()); // Dispatch the action to toggle night mode
+  };
+
   const populationLayerVisible = useSelector(
     (state: RootState) => state.map.populationLayerVisible
   );
@@ -472,6 +480,22 @@ const LeftPanel = () => {
         </h1>
       </div>
 
+      {/* Night Mode Toggle Button */}
+      {/* Night Mode Toggle Button */}
+      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-xs md:text-sm font-semibold text-gray-700">
+            Night Mode
+          </span>
+          <Switch
+            checked={isNightMode}
+            onChange={handleToggleMapStyle}
+            checkedChildren="🌙"
+            unCheckedChildren="☀️"
+          />
+        </div>
+      </div>
+
       {/* Step 1: More compact padding and text */}
       <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
         <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
@@ -614,7 +638,7 @@ const LeftPanel = () => {
       )}
 
       {/* Step 3: More compact population analysis section */}
-      {showPopulationSection && (
+      {
         <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
           <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
             Step 3: Population Coverage
@@ -712,10 +736,10 @@ const LeftPanel = () => {
             </div>
           )}
         </div>
-      )}
+      }
 
       {/* Suggested Hubs Section - more compact */}
-      {datasets.some((dataset) => dataset.visible) && (
+      {
         <div className="p-3 bg-white rounded-lg shadow-sm">
           <button
             onClick={handleGetSuggestedHubs}
@@ -737,7 +761,7 @@ const LeftPanel = () => {
             </div>
           )}
         </div>
-      )}
+      }
     </div>
   );
 };
