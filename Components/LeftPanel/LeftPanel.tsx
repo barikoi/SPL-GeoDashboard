@@ -146,15 +146,12 @@ const LeftPanel = () => {
   const [fileUploaded, setFileUploaded] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [hubLocationFile, setHubLocationFile] = useState<File | null>(null);
   const [populationFile, setPopulationFile] = useState<File | null>(null);
   const [suggestedHubsCount, setSuggestedHubsCount] = useState<number | null>(
     null
   );
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [hasCoverageColumn, setHasCoverageColumn] = useState<boolean>(false);
-  const [processedHubFile, setProcessedHubFile] = useState<File | null>(null);
-  const [showCoverageError, setShowCoverageError] = useState<boolean>(false);
 
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector(
@@ -174,17 +171,11 @@ const LeftPanel = () => {
     const files = e.target.files;
     if (!files || !files[0]) {
       setFileUploaded(false);
-      setHubLocationFile(null);
-      setShowCoverageError(false);
-      setProcessedHubFile(null);
       return;
     }
 
     setFileUploaded(true);
     const file = files[0];
-    setHubLocationFile(file);
-    setShowCoverageError(false);
-    setProcessedHubFile(null);
 
     const reader = new FileReader();
     reader.onload = async (e: ProgressEvent<FileReader>) => {
@@ -205,9 +196,6 @@ const LeftPanel = () => {
             complete: (result) => {
               const hasCoverage = checkForCoverageColumn(result.data);
               setHasCoverageColumn(hasCoverage);
-              if (!hasCoverage) {
-                setShowCoverageError(true);
-              }
               const normalizedData = normalizeData(result.data, "csv");
               dispatch(
                 addDataset({
@@ -225,7 +213,6 @@ const LeftPanel = () => {
         } else if (file.name.endsWith(".json")) {
           const jsonData = JSON.parse(content);
           setHasCoverageColumn(false);
-          setShowCoverageError(true);
           const normalizedData = normalizeData(jsonData, "json");
           dispatch(
             addDataset({
@@ -244,41 +231,13 @@ const LeftPanel = () => {
     reader.readAsText(file);
   };
 
-  const handleProcessedHubFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        Papa.parse(e.target.result as string, {
-          header: true,
-          complete: (result) => {
-            const hasCoverage = checkForCoverageColumn(result.data);
-            if (hasCoverage) {
-              setProcessedHubFile(file);
-              setShowCoverageError(false);
-              message.success("Valid processed hub file uploaded");
-            } else {
-              setProcessedHubFile(null);
-              message.error("This file does not contain coverage data");
-            }
-          },
-        });
-      }
-    };
-    reader?.readAsText(file);
-  };
-
   const handleDeleteDataset = (id: string) => {
     dispatch(removeDataset(id));
     // Check if there are any remaining datasets
     const remainingDatasets = datasets.filter((d) => d.id !== id);
     if (remainingDatasets.length === 0) {
       setFileUploaded(false);
-      setHubLocationFile(null);
-      setShowCoverageError(false);
-      setProcessedHubFile(null);
+      setPopulationFile(null);
     }
   };
 
@@ -332,17 +291,15 @@ const LeftPanel = () => {
   };
 
   const handleCalculatePopulation = async () => {
-    const fileToUse = processedHubFile || hubLocationFile;
-
-    if (!fileToUse || !populationFile) {
-      message.error("Please upload both hub locations and population files.");
+    if (!populationFile) {
+      message.error("Please upload population file.");
       return;
     }
 
-    if (!hasCoverageColumn && !processedHubFile) {
-      message.error(
-        "Please calculate walkable coverage first and upload the processed file."
-      );
+    // Check if either coverage column exists or isochrones are calculated
+    const hasIsochrones = datasets.some((dataset) => dataset.hasIsochrones);
+    if (!hasCoverageColumn && !hasIsochrones) {
+      message.error("Please calculate walkable coverage first.");
       return;
     }
 
@@ -350,10 +307,28 @@ const LeftPanel = () => {
     setUploadProgress(0);
 
     try {
-      // Upload hub locations
-      const hubFormData = new FormData();
-      hubFormData.append("file", fileToUse);
+      // Get the dataset with coverage (either from file or calculated)
+      const dataset = hasCoverageColumn
+        ? datasets[0]
+        : datasets.find((d) => d.hasIsochrones);
+      if (!dataset) {
+        throw new Error("No dataset with coverage found");
+      }
 
+      // Create CSV with coverage data
+      const csvData = dataset.data.map((point) => ({
+        ...point.properties,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        coverage: point.coverage ? JSON.stringify(point.coverage) : null,
+      }));
+
+      // Create form data for hub locations
+      const hubFormData = new FormData();
+      const csvBlob = new Blob([Papa.unparse(csvData)], { type: "text/csv" });
+      hubFormData.append("file", csvBlob, dataset.name);
+
+      // Upload hub locations with coverage
       const hubResponse = await fetch(
         "http://202.72.236.166:8000/upload_hub_locations/",
         {
@@ -367,23 +342,9 @@ const LeftPanel = () => {
       );
 
       if (!hubResponse.ok) throw new Error("Hub locations upload failed.");
-
-      const processedData = await hubResponse.json();
-
-      // Update dataset with processed data
-      const dataset = datasets.find((d) => d.visible);
-      if (dataset) {
-        dispatch(
-          updateDatasetWithDownloadable({
-            datasetId: dataset.id,
-            downloadableData: processedData,
-          })
-        );
-      }
-
       setUploadProgress(33);
 
-      // Continue with population upload and calculation
+      // Upload population file
       const populationFormData = new FormData();
       populationFormData.append("file", populationFile);
 
@@ -423,7 +384,7 @@ const LeftPanel = () => {
       message.error(
         error instanceof Error
           ? error.message
-          : "Failed to calculate population coverage."
+          : "Failed to calculate population coverage"
       );
     } finally {
       setIsCalculating(false);
@@ -538,36 +499,6 @@ const LeftPanel = () => {
               : "bg-white border-gray-300 text-gray-800"
           }`}
         />
-
-        {showCoverageError && (
-          <>
-            <div
-              className={`p-2 mb-2 rounded-lg text-xs ${
-                isNightMode
-                  ? "bg-yellow-800 border-yellow-700 text-yellow-100"
-                  : "bg-yellow-50 border-yellow-200 text-yellow-800"
-              }`}
-            >
-              ⚠️ This file needs walkable coverage data. Please:
-              <ol className="ml-3 mt-0.5 list-decimal">
-                <li>Calculate walkable coverage below</li>
-                <li>Download the processed file</li>
-                <li>Upload it here</li>
-              </ol>
-            </div>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleProcessedHubFile}
-              className={`w-full p-1.5 border-2 border-dashed rounded-lg hover:border-red-500 transition-colors cursor-pointer text-xs ${
-                isNightMode
-                  ? "bg-gray-600 border-red-400 text-gray-100"
-                  : "bg-white border-red-300 text-gray-800"
-              }`}
-              placeholder="Upload processed file with coverage data"
-            />
-          </>
-        )}
 
         {/* Dataset list with download options */}
         {fileUploaded && (
@@ -727,19 +658,6 @@ const LeftPanel = () => {
             Population Coverage
           </h2>
 
-          {showCoverageError && !processedHubFile && (
-            <div
-              className={`p-2 mb-2 rounded-lg text-xs ${
-                isNightMode
-                  ? "bg-red-800 border-red-700 text-red-100"
-                  : "bg-red-50 border-red-200 text-red-700"
-              }`}
-            >
-              ⚠️ Complete "Calculate Walkable Coverage" first and upload
-              processed file
-            </div>
-          )}
-
           <div className="mb-2">
             <input
               type="file"
@@ -805,14 +723,16 @@ const LeftPanel = () => {
             </div>
           )}
 
-          {hubLocationFile && populationFile && (
+          {populationFile && (
             <button
               onClick={handleCalculatePopulation}
               disabled={
-                isCalculating || (showCoverageError && !processedHubFile)
+                isCalculating ||
+                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
-                isCalculating || (showCoverageError && !processedHubFile)
+                isCalculating ||
+                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
                   ? "opacity-50 cursor-not-allowed"
                   : ""
               }`}
@@ -822,8 +742,9 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : showCoverageError && !processedHubFile ? (
-                "Complete Previous Steps First"
+              ) : !hasCoverageColumn &&
+                !datasets.some((d) => d.hasIsochrones) ? (
+                "Calculate Walkable Coverage First"
               ) : (
                 "Calculate Population Coverage"
               )}

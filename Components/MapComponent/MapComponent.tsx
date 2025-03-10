@@ -13,6 +13,8 @@ import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "./bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
+import Papa from "papaparse";
+import { message } from "antd";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.6364439,
@@ -181,17 +183,51 @@ function MapComponent() {
                 })
               );
 
+              // Update local state with isochrones
               dispatch(
                 updateDatasetWithIsochrones({
                   datasetId: dataset.id,
                   updatedData,
                 })
               );
+
+              // Create CSV with coverage data
+              const csvData = updatedData.map((point) => ({
+                ...point.properties,
+                latitude: point.latitude,
+                longitude: point.longitude,
+                coverage: point.isochrones,
+              }));
+
+              // Create form data for upload
+              const formData = new FormData();
+              const csvBlob = new Blob([Papa.unparse(csvData)], {
+                type: "text/csv",
+              });
+              formData.append("file", csvBlob, dataset.name);
+
+              // Upload processed file
+              const uploadResponse = await fetch(
+                "http://202.72.236.166:8000/upload_hub_locations/",
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+
+              if (!uploadResponse.ok) {
+                throw new Error("Failed to upload processed file");
+              }
+
+              message.success(
+                "Coverage calculated and file processed successfully"
+              );
             }
           }
           setIsochronesCalculated(true);
         } catch (error) {
           console.error("Error in fetchIsochrones:", error);
+          message.error("Failed to process coverage data");
         } finally {
           setProgress(0);
           dispatch(resetIsochrones());
