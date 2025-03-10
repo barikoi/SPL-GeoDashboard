@@ -91,11 +91,12 @@ const mapSlice = createSlice({
         (d) => d.id === action.payload.datasetId
       );
       if (dataset) {
-        dataset.data = dataset.data.map((point, index) => ({
+        // Directly update the data with isochrones
+        dataset.data = action.payload.updatedData.map((point) => ({
           ...point,
-          coverage: action.payload.coverageData[index], // Add coverage data
+          coverage: point.isochrones ? JSON.parse(point.isochrones) : null,
         }));
-        dataset.hasIsochrones = true; // Mark that coverage data is available
+        dataset.hasIsochrones = true;
       }
     },
     resetIsochrones: (state) => {

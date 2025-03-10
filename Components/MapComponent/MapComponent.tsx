@@ -148,44 +148,39 @@ function MapComponent() {
   useEffect(() => {
     if (showIsochrones) {
       const fetchIsochrones = async () => {
-        const newIsochrones = [];
-        const totalPoints = datasets.reduce(
-          (sum, dataset) => sum + (dataset.visible ? dataset.data.length : 0),
-          0
-        );
-        let processedPoints = 0;
-        setProgress(0);
-
         try {
           for (const dataset of datasets) {
             if (dataset.visible) {
-              const updatedData = [];
-              for (const point of dataset.data) {
-                try {
-                  const response = await fetch(
-                    `https://gh.bmapsbd.com/sau/isochrone?point=${
-                      point.latitude
-                    },${point.longitude}&profile=foot&time_limit=${
-                      timeLimit * 60
-                    }&reverse_flow=true`
-                  );
-                  const isochroneData = await response.json();
-                  const geometry = transformIsochroneToGeometry(isochroneData);
-                  updatedData.push({
-                    ...point,
-                    isochrones: geometry ? JSON.stringify(geometry) : null,
-                  });
-                  newIsochrones.push({
-                    data: isochroneData,
-                    datasetId: dataset.id,
-                  });
-                  processedPoints++;
-                  setProgress((processedPoints / totalPoints) * 100);
-                } catch (error) {
-                  console.error("Error fetching isochrone data:", error);
-                  updatedData.push(point);
-                }
-              }
+              const updatedData = await Promise.all(
+                dataset.data.map(async (point) => {
+                  try {
+                    const response = await fetch(
+                      `https://gh.bmapsbd.com/sau/isochrone?point=${
+                        point.latitude
+                      },${point.longitude}&profile=foot&time_limit=${
+                        timeLimit * 60
+                      }&reverse_flow=true`
+                    );
+
+                    if (!response.ok) {
+                      throw new Error(`API Error: ${response.statusText}`);
+                    }
+
+                    const isochroneData = await response.json();
+                    const geometry =
+                      transformIsochroneToGeometry(isochroneData);
+
+                    return {
+                      ...point,
+                      isochrones: geometry ? JSON.stringify(geometry) : null,
+                    };
+                  } catch (error) {
+                    console.error("Error fetching isochrone:", error);
+                    return point;
+                  }
+                })
+              );
+
               dispatch(
                 updateDatasetWithIsochrones({
                   datasetId: dataset.id,
@@ -194,43 +189,12 @@ function MapComponent() {
               );
             }
           }
-          setIsochrones(newIsochrones);
           setIsochronesCalculated(true);
-
-          // Create isochrone layers
-          const newLayers = datasets
-            .filter((dataset) => dataset.visible)
-            .flatMap((dataset) =>
-              dataset.data.some((d: any) => d.isochrones)
-                ? [
-                    new GeoJsonLayer({
-                      id: `isochrone-layer-${dataset.id}`,
-                      data: dataset.data
-                        .filter((d: any) => d.isochrones)
-                        .map((d: any) => ({
-                          type: "Feature",
-                          geometry: JSON.parse(d.isochrones),
-                          properties: {},
-                        })),
-                      getFillColor: [...dataset.color, 100],
-                      getLineColor: dataset.strokedColor,
-                      getLineWidth: 3,
-                    }),
-                  ]
-                : []
-            );
-          setIsochroneLayers(newLayers);
-
-          setTimeout(() => {
-            setProgress(0);
-            dispatch(resetIsochrones());
-          }, 1000);
         } catch (error) {
           console.error("Error in fetchIsochrones:", error);
+        } finally {
           setProgress(0);
           dispatch(resetIsochrones());
-          setIsochronesCalculated(false);
-          setIsochroneLayers([]);
         }
       };
 
