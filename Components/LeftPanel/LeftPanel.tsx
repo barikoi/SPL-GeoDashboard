@@ -723,15 +723,17 @@ const LeftPanel = () => {
             </div>
           )}
 
-          {populationFile && (
+          {
             <button
               onClick={handleCalculatePopulation}
               disabled={
                 isCalculating ||
+                !populationFile ||
                 (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
+                !populationFile ||
                 (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
                   ? "opacity-50 cursor-not-allowed"
                   : ""
@@ -745,11 +747,13 @@ const LeftPanel = () => {
               ) : !hasCoverageColumn &&
                 !datasets.some((d) => d.hasIsochrones) ? (
                 "Calculate Walkable Coverage First"
+              ) : !populationFile ? (
+                "Upload Population file"
               ) : (
                 "Calculate Population Coverage"
               )}
             </button>
-          )}
+          }
 
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="mt-2">
