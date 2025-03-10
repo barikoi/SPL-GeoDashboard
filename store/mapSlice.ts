@@ -91,8 +91,11 @@ const mapSlice = createSlice({
         (d) => d.id === action.payload.datasetId
       );
       if (dataset) {
-        dataset.data = action.payload.updatedData;
-        dataset.hasIsochrones = true; // Add flag to indicate isochrones are available
+        dataset.data = dataset.data.map((point, index) => ({
+          ...point,
+          coverage: action.payload.coverageData[index], // Add coverage data
+        }));
+        dataset.hasIsochrones = true; // Mark that coverage data is available
       }
     },
     resetIsochrones: (state) => {

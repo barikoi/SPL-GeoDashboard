@@ -27,6 +27,7 @@ import SPL from "./SPL_Logo.webp";
 import { Progress, message, Spin, Tooltip } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { Switch } from "antd";
+
 // Add proper types for the data
 interface DataPoint {
   latitude: number;
@@ -37,17 +38,19 @@ interface DataPoint {
   coverage?: any;
 }
 
-// Helper function to generate random colors
 const getRandomColor = (): [number, number, number] => {
   const colors: [number, number, number][] = [
-    [139, 0, 0], // Dark Red
-    [0, 100, 0], // Dark Green
-    [0, 0, 139], // Dark Blue
-    [255, 140, 0], // Dark Orange
-    [75, 0, 130], // Indigo
-    [47, 79, 79], // Dark Slate Gray
-    [105, 105, 105], // Dim Gray
-    [85, 107, 47], // Dark Olive Green
+    [235, 159, 239],
+    [3, 37, 78],
+    [245, 213, 71],
+    [219, 48, 105],
+    [247, 92, 3],
+    [4, 167, 119],
+    [214, 159, 126],
+    [135, 0, 88],
+    [200, 214, 175],
+    [105, 56, 92],
+    [62, 146, 204],
   ];
   return colors[Math.floor(Math.random() * colors.length)];
 };
@@ -154,14 +157,13 @@ const LeftPanel = () => {
   const [showCoverageError, setShowCoverageError] = useState<boolean>(false);
 
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
+  const populationLayerVisible = useSelector(
+    (state: RootState) => state.map.populationLayerVisible
+  );
 
   const handleToggleMapStyle = (checked: boolean) => {
     dispatch(toggleNightMode()); // Dispatch the action to toggle night mode
   };
-
-  const populationLayerVisible = useSelector(
-    (state: RootState) => state.map.populationLayerVisible
-  );
 
   const checkForCoverageColumn = (data: any[]): boolean => {
     if (!data || data.length === 0) return false;
@@ -465,7 +467,13 @@ const LeftPanel = () => {
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
   return (
-    <div className="w-full md:w-[22vw] h-[50vh] md:h-screen p-3 md:p-4 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 z-10 shadow-xl overflow-y-auto">
+    <div
+      className={`w-full md:w-[22vw] h-[50vh] md:h-screen p-3 md:p-4 z-10 shadow-xl overflow-y-auto ${
+        isNightMode
+          ? "bg-gradient-to-b from-gray-800 to-gray-900 text-gray-100" // Night mode colors
+          : "bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800" // Day mode colors
+      }`}
+    >
       {/* Header Section - more compact */}
       <div className="flex items-center mb-3">
         <Image
@@ -475,17 +483,28 @@ const LeftPanel = () => {
           height={0}
           className="w-6 md:w-12 rounded-lg shadow-md"
         />
-        <h1 className="text-base md:text-lg font-bold ml-2 text-gray-900">
+        <h1
+          className={`${
+            !isNightMode ? "text-gray-900" : "text-gray-100"
+          } md:text-lg font-bold ml-2`}
+        >
           GeoDashboard
         </h1>
       </div>
 
       {/* Night Mode Toggle Button */}
-      {/* Night Mode Toggle Button */}
-      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
+      <div
+        className={`mb-4 p-3 rounded-lg shadow-sm ${
+          isNightMode ? "bg-gray-700" : "bg-white"
+        }`}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs md:text-sm font-semibold text-gray-700">
-            Night Mode
+          <span
+            className={`text-xs md:text-sm font-semibold ${
+              isNightMode ? "text-gray-200" : "text-gray-700"
+            }`}
+          >
+            {isNightMode ? "Night Mode" : "Day Mode"}
           </span>
           <Switch
             checked={isNightMode}
@@ -497,20 +516,38 @@ const LeftPanel = () => {
       </div>
 
       {/* Step 1: More compact padding and text */}
-      <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
-        <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
-          Step 1: Upload Hub Locations
+      <div
+        className={`mb-4 p-3 rounded-lg shadow-sm ${
+          isNightMode ? "bg-gray-700" : "bg-white"
+        }`}
+      >
+        <h2
+          className={`text-xs md:text-sm font-semibold mb-2 ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}
+        >
+          Upload Hub Locations
         </h2>
         <input
           type="file"
           accept=".json,.csv"
           onChange={handleFileChange}
-          className="w-full p-1.5 border-2 border-dashed border-gray-300 rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs"
+          className={`w-full p-1.5 border-2 border-dashed rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs ${
+            isNightMode
+              ? "bg-gray-600 border-gray-500 text-gray-100"
+              : "bg-white border-gray-300 text-gray-800"
+          }`}
         />
 
         {showCoverageError && (
           <>
-            <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-xs">
+            <div
+              className={`p-2 mb-2 rounded-lg text-xs ${
+                isNightMode
+                  ? "bg-yellow-800 border-yellow-700 text-yellow-100"
+                  : "bg-yellow-50 border-yellow-200 text-yellow-800"
+              }`}
+            >
               ⚠️ This file needs walkable coverage data. Please:
               <ol className="ml-3 mt-0.5 list-decimal">
                 <li>Calculate walkable coverage below</li>
@@ -522,7 +559,11 @@ const LeftPanel = () => {
               type="file"
               accept=".csv"
               onChange={handleProcessedHubFile}
-              className="w-full p-1.5 border-2 border-dashed border-red-300 rounded-lg hover:border-red-500 transition-colors cursor-pointer text-xs"
+              className={`w-full p-1.5 border-2 border-dashed rounded-lg hover:border-red-500 transition-colors cursor-pointer text-xs ${
+                isNightMode
+                  ? "bg-gray-600 border-red-400 text-gray-100"
+                  : "bg-white border-red-300 text-gray-800"
+              }`}
               placeholder="Upload processed file with coverage data"
             />
           </>
@@ -531,20 +572,28 @@ const LeftPanel = () => {
         {/* Dataset list with download options */}
         {fileUploaded && (
           <div className="mb-3">
-            <h3 className="text-xs font-medium mb-1.5 text-gray-600">
+            <h3
+              className={`text-xs font-medium mb-1.5 ${
+                isNightMode ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
               Uploaded Datasets:
             </h3>
             {datasets.map((dataset) => (
               <div
                 key={dataset.id}
-                className="flex items-center justify-between mb-1.5 p-1.5 bg-gray-50 rounded-lg"
+                className={`flex items-center justify-between mb-1.5 p-1.5 rounded-lg ${
+                  isNightMode ? "bg-gray-600" : "bg-gray-50"
+                }`}
               >
                 <div className="flex items-center">
                   <button
                     onClick={() =>
                       dispatch(toggleDatasetVisibility(dataset.id))
                     }
-                    className="mr-2 text-gray-500 hover:text-blue-500 transition-colors"
+                    className={`mr-2 ${
+                      isNightMode ? "text-gray-300" : "text-gray-500"
+                    } hover:text-blue-500 transition-colors`}
                   >
                     {dataset.visible ? (
                       <FaEye size={14} />
@@ -558,7 +607,11 @@ const LeftPanel = () => {
                       backgroundColor: `rgb(${dataset.color.join(",")})`,
                     }}
                   />
-                  <span className="text-xs font-medium text-gray-700">
+                  <span
+                    className={`text-xs font-medium ${
+                      isNightMode ? "text-gray-200" : "text-gray-700"
+                    }`}
+                  >
                     {dataset.name}
                   </span>
                 </div>
@@ -566,7 +619,9 @@ const LeftPanel = () => {
                   <Tooltip title="Delete Dataset">
                     <button
                       onClick={() => handleDeleteDataset(dataset.id)}
-                      className="text-gray-500 hover:text-red-500 transition-colors"
+                      className={`${
+                        isNightMode ? "text-gray-300" : "text-gray-500"
+                      } hover:text-red-500 transition-colors`}
                     >
                       <FaTrash size={14} />
                     </button>
@@ -580,7 +635,9 @@ const LeftPanel = () => {
                   >
                     <button
                       onClick={() => downloadCSV(dataset)}
-                      className={`text-gray-500 transition-colors ${
+                      className={`${
+                        isNightMode ? "text-gray-300" : "text-gray-500"
+                      } transition-colors ${
                         dataset.hasIsochrones
                           ? "hover:text-blue-500"
                           : "opacity-50 cursor-not-allowed"
@@ -599,19 +656,33 @@ const LeftPanel = () => {
 
       {/* Step 2: More compact dataset list and controls */}
       {fileUploaded && !hasCoverageColumn && (
-        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
-          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
-            Step 2: Calculate Walkable Coverage
+        <div
+          className={`mb-4 p-3 rounded-lg shadow-sm ${
+            isNightMode ? "bg-gray-700" : "bg-white"
+          }`}
+        >
+          <h2
+            className={`text-xs md:text-sm font-semibold mb-2 ${
+              isNightMode ? "text-gray-200" : "text-gray-700"
+            }`}
+          >
+            Calculate Walkable Coverage
           </h2>
 
           {/* Walking time input and calculate button */}
           <div className="mb-2">
-            <label className="block text-xs font-medium mb-1 text-gray-700">
+            <label
+              className={`block text-xs font-medium mb-1 ${
+                isNightMode ? "text-gray-200" : "text-gray-700"
+              }`}
+            >
               Walking Time (min):
               <Tooltip title="Maximum walking time from each point. For example, in 10 minutes, you can cover a certain distance from each point.">
                 <span>
                   <FaInfoCircle
-                    className="inline ml-1 text-gray-400"
+                    className={`inline ml-1 ${
+                      isNightMode ? "text-gray-400" : "text-gray-500"
+                    }`}
                     size={12}
                   />
                 </span>
@@ -623,14 +694,18 @@ const LeftPanel = () => {
               onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
               min="1"
               max="60"
-              className="w-full p-1.5 border border-gray-300 rounded-lg bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs"
+              className={`w-full p-1.5 border rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs ${
+                isNightMode
+                  ? "bg-gray-600 border-gray-500 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-800"
+              }`}
               placeholder="1-60 minutes"
             />
           </div>
 
           <button
             onClick={() => dispatch(showIsochrones())}
-            className="w-full py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center"
+            className={`w-full py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center`}
           >
             Calculate Walkable Coverage
           </button>
@@ -639,14 +714,29 @@ const LeftPanel = () => {
 
       {/* Step 3: More compact population analysis section */}
       {
-        <div className="mb-4 p-3 bg-white rounded-lg shadow-sm">
-          <h2 className="text-xs md:text-sm font-semibold mb-2 text-gray-700">
-            Step 3: Population Coverage
+        <div
+          className={`mb-4 p-3 rounded-lg shadow-sm ${
+            isNightMode ? "bg-gray-700" : "bg-white"
+          }`}
+        >
+          <h2
+            className={`text-xs md:text-sm font-semibold mb-2 ${
+              isNightMode ? "text-gray-200" : "text-gray-700"
+            }`}
+          >
+            Population Coverage
           </h2>
 
           {showCoverageError && !processedHubFile && (
-            <div className="p-2 mb-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
-              ⚠️ Complete Step 2 first and upload processed file
+            <div
+              className={`p-2 mb-2 rounded-lg text-xs ${
+                isNightMode
+                  ? "bg-red-800 border-red-700 text-red-100"
+                  : "bg-red-50 border-red-200 text-red-700"
+              }`}
+            >
+              ⚠️ Complete "Calculate Walkable Coverage" first and upload
+              processed file
             </div>
           )}
 
@@ -669,18 +759,28 @@ const LeftPanel = () => {
               Select Population File
             </label>
             {populationFile && (
-              <div className="mt-1 text-xs text-gray-600">
+              <div
+                className={`mt-1 text-xs ${
+                  isNightMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
                 Selected: {populationFile.name}
               </div>
             )}
           </div>
 
           {populationFile && (
-            <div className="flex items-center justify-between mt-2 mb-2 p-1.5 bg-gray-50 rounded-lg">
+            <div
+              className={`flex items-center justify-between mt-2 mb-2 p-1.5 rounded-lg ${
+                isNightMode ? "bg-gray-600" : "bg-gray-50"
+              }`}
+            >
               <div className="flex items-center">
                 <button
                   onClick={() => dispatch(togglePopulationLayer())}
-                  className="mr-2 text-gray-500 hover:text-blue-500 transition-colors"
+                  className={`mr-2 ${
+                    isNightMode ? "text-gray-300" : "text-gray-500"
+                  } hover:text-blue-500 transition-colors`}
                 >
                   {populationLayerVisible ? (
                     <FaEye size={14} />
@@ -694,7 +794,11 @@ const LeftPanel = () => {
                     backgroundColor: "rgb(139, 95, 191)",
                   }}
                 />
-                <span className="text-xs font-medium text-gray-700">
+                <span
+                  className={`text-xs font-medium ${
+                    isNightMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+                >
                   Population Density
                 </span>
               </div>
@@ -740,7 +844,11 @@ const LeftPanel = () => {
 
       {/* Suggested Hubs Section - more compact */}
       {
-        <div className="p-3 bg-white rounded-lg shadow-sm">
+        <div
+          className={`p-3 rounded-lg shadow-sm ${
+            isNightMode ? "bg-gray-700" : "bg-white"
+          }`}
+        >
           <button
             onClick={handleGetSuggestedHubs}
             disabled={isLoadingSuggestions}
@@ -755,7 +863,13 @@ const LeftPanel = () => {
           </button>
 
           {suggestedHubsCount !== null && (
-            <div className="mt-2 p-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg text-xs text-center">
+            <div
+              className={`mt-2 p-1.5 rounded-lg text-xs text-center ${
+                isNightMode
+                  ? "bg-purple-800 border-purple-700 text-purple-100"
+                  : "bg-purple-50 border-purple-200 text-purple-700"
+              }`}
+            >
               Found {suggestedHubsCount} suggested hub
               {suggestedHubsCount !== 1 ? "s" : ""}
             </div>

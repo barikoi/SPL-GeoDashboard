@@ -266,14 +266,6 @@ function MapComponent() {
     ...datasets
       .filter((dataset) => dataset.visible)
       .flatMap((dataset) => [
-        new ScatterplotLayer({
-          id: `scatterplot-layer-${dataset.id}`,
-          data: dataset.data,
-          getPosition: (d) => [d.longitude, d.latitude],
-          getRadius: 100,
-          getFillColor: [...dataset.color, 200],
-          pickable: true,
-        }),
         new GeoJsonLayer({
           id: `coverage-layer-${dataset.id}`,
           data: dataset.data
@@ -288,18 +280,18 @@ function MapComponent() {
           getLineWidth: 3,
           pickable: false,
         }),
+        new ScatterplotLayer({
+          id: `scatterplot-layer-${dataset.id}`,
+          data: dataset.data,
+          getPosition: (d) => [d.longitude, d.latitude],
+          getRadius: 100,
+          getFillColor: [...dataset.color],
+          pickable: true,
+        }),
       ]),
     ...(isochronesCalculated ? isochroneLayers : []),
     ...(suggestedHubs
       ? [
-          new ScatterplotLayer({
-            id: "suggested-hubs-points",
-            data: suggestedHubs,
-            getPosition: (d) => [d.longitude, d.latitude],
-            getRadius: 150,
-            getFillColor: [83, 19, 30, 200],
-            pickable: true,
-          }),
           new GeoJsonLayer({
             id: "suggested-hubs-coverage",
             data: suggestedHubs.map((hub) => ({
@@ -307,9 +299,17 @@ function MapComponent() {
               geometry: JSON.parse(hub.coverage),
               properties: {},
             })),
-            getFillColor: [83, 19, 30, 80],
-            getLineColor: [83, 19, 30, 200],
+            getFillColor: isNightMode ? [145, 245, 173] : [251, 75, 78, 80],
+            getLineColor: [251, 75, 78, 200],
             getLineWidth: 4,
+          }),
+          new ScatterplotLayer({
+            id: "suggested-hubs-points",
+            data: suggestedHubs,
+            getPosition: (d) => [d.longitude, d.latitude],
+            getRadius: 150,
+            getFillColor: [83, 19, 30, 200],
+            pickable: true,
           }),
         ]
       : []),
