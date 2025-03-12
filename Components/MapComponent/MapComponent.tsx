@@ -1,13 +1,19 @@
 // components/MapComponent.tsx
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { AttributionControl, Map } from "react-map-gl/maplibre";
+import {
+  AttributionControl,
+  Map,
+  NavigationControl,
+  useControl,
+} from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
 import { updateDatasetWithIsochrones, resetIsochrones } from "@/store/mapSlice";
+import { MapboxOverlay } from "@deck.gl/mapbox";
 import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
@@ -17,11 +23,11 @@ import Papa from "papaparse";
 import { message } from "antd";
 
 const INITIAL_VIEW_STATE = {
-  longitude: 46.6364439,
-  latitude: 24.8335129,
-  zoom: 12,
-  pitch: 0,
-  bearing: 0,
+  longitude: 46.7941,
+  latitude: 24.8343,
+  zoom: 10,
+  pitch: 60,
+  bearing: 20,
 };
 
 // Add proper type for the isochrone data
@@ -73,6 +79,13 @@ interface HoverInfo {
   x: number;
   y: number;
   type: "point" | "hexagon" | "suggested";
+}
+
+// Add DeckGLOverlay component
+function DeckGLOverlay(props: DeckProps) {
+  const overlay = useControl<MapboxOverlay>(() => new MapboxOverlay(props));
+  overlay.setProps(props);
+  return null;
 }
 
 function MapComponent() {
@@ -362,25 +375,22 @@ function MapComponent() {
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
-      <DeckGL
+      <Map
         initialViewState={INITIAL_VIEW_STATE}
-        controller={true}
-        layers={layers}
-        getTooltip={getTooltip}
+        style={{ width: "100%", height: "100%" }}
+        mapStyle={mapStyle}
+        attributionControl={false}
+        hash={true}
+        // interactiveLayerIds={["navigation-control"]} // Ensure the map is interactive
       >
-        <Map
-          initialViewState={{
-            longitude: -122.4,
-            latitude: 37.8,
-            zoom: 14,
-          }}
-          style={{ width: "100%", height: "100%" }}
-          mapStyle={mapStyle}
-          attributionControl={false}
-        >
-          <AttributionControl customAttribution="Barikoi" />
-        </Map>
-      </DeckGL>
+        <DeckGLOverlay layers={layers} getTooltip={getTooltip} interleaved />
+        <NavigationControl position="top-right" style={{ zIndex: 1 }} />
+        <AttributionControl
+          customAttribution="Barikoi"
+          position="bottom-right"
+          style={{ zIndex: 1 }}
+        />
+      </Map>
 
       <div className="absolute bottom-2 md:bottom-2 left-2 md:left-2 z-[1000]">
         <Image

@@ -744,11 +744,13 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
+              ) : !fileUploaded ? (
+                "Upload Hub Locations"
               ) : !hasCoverageColumn &&
                 !datasets.some((d) => d.hasIsochrones) ? (
-                "Calculate Walkable Coverage First"
+                "Calculate Walkable Coverage"
               ) : !populationFile ? (
-                "Upload Population file"
+                "Upload Population File"
               ) : (
                 "Calculate Population Coverage"
               )}
