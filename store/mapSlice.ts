@@ -33,6 +33,7 @@ interface MapState {
   suggestedHubs: SuggestedHub[] | null;
   populationLayerVisible: boolean;
   isNightMode: boolean;
+  isCalculatingCoverage: boolean;
 }
 
 const initialState: MapState = {
@@ -44,6 +45,7 @@ const initialState: MapState = {
   suggestedHubs: null,
   populationLayerVisible: true,
   isNightMode: false,
+  isCalculatingCoverage: false,
 };
 
 const mapSlice = createSlice({
@@ -122,6 +124,9 @@ const mapSlice = createSlice({
     toggleNightMode: (state) => {
       state.isNightMode = !state.isNightMode; // Toggle night mode
     },
+    setCalculatingCoverage: (state, action: PayloadAction<boolean>) => {
+      state.isCalculatingCoverage = action.payload;
+    },
   },
 });
 
@@ -139,5 +144,6 @@ export const {
   setSuggestedHubs,
   togglePopulationLayer,
   toggleNightMode,
+  setCalculatingCoverage,
 } = mapSlice.actions;
 export default mapSlice.reducer;

@@ -8,7 +8,7 @@ import {
   removeDataset,
   setTimeLimit,
   showIsochrones,
-  updateDatasetWithDownloadable,
+  setCalculatingCoverage,
   setSuggestedHubs,
   togglePopulationLayer,
   toggleNightMode,
@@ -156,6 +156,10 @@ const LeftPanel = () => {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector(
     (state: RootState) => state.map.populationLayerVisible
+  );
+
+  const isCalculatingCoverage = useSelector(
+    (state: RootState) => state.map.isCalculatingCoverage
   );
 
   const handleToggleMapStyle = (checked: boolean) => {
@@ -625,21 +629,36 @@ const LeftPanel = () => {
               onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
               min="1"
               max="60"
+              disabled={isCalculatingCoverage}
               className={`w-full p-1.5 border rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs ${
                 isNightMode
                   ? "bg-gray-600 border-gray-500 text-gray-100"
                   : "bg-white border-gray-300 text-gray-800"
+              } ${
+                isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""
               }`}
               placeholder="1-60 minutes"
             />
           </div>
 
-          <button
-            onClick={() => dispatch(showIsochrones())}
-            className={`w-full py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center`}
-          >
-            Calculate Walkable Coverage
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => dispatch(showIsochrones())}
+              disabled={isCalculatingCoverage}
+              className={`flex-1 py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center ${
+                isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {isCalculatingCoverage ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <Spin size="small" />
+                  <span>Calculating...</span>
+                </div>
+              ) : (
+                "Calculate Coverage"
+              )}
+            </button>
+          </div>
         </div>
       )}
 

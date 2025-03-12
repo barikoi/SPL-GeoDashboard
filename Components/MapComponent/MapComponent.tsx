@@ -12,7 +12,11 @@ import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
-import { updateDatasetWithIsochrones, resetIsochrones } from "@/store/mapSlice";
+import {
+  updateDatasetWithIsochrones,
+  resetIsochrones,
+  setCalculatingCoverage,
+} from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import type { Geometry } from "geojson";
 import { Progress } from "antd"; // Import Ant Design Progress
@@ -163,6 +167,7 @@ function MapComponent() {
   useEffect(() => {
     if (showIsochrones) {
       const fetchIsochrones = async () => {
+        dispatch(setCalculatingCoverage(true));
         try {
           for (const dataset of datasets) {
             if (dataset.visible) {
@@ -176,7 +181,6 @@ function MapComponent() {
                         timeLimit * 60
                       }&reverse_flow=true`
                     );
-
                     if (!response.ok) {
                       throw new Error(`API Error: ${response.statusText}`);
                     }
@@ -238,12 +242,16 @@ function MapComponent() {
             }
           }
           setIsochronesCalculated(true);
+          message.success(
+            "Coverage calculated and file processed successfully"
+          );
         } catch (error) {
           console.error("Error in fetchIsochrones:", error);
           message.error("Failed to process coverage data");
         } finally {
           setProgress(0);
           dispatch(resetIsochrones());
+          dispatch(setCalculatingCoverage(false)); // End
         }
       };
 
@@ -320,7 +328,7 @@ function MapComponent() {
             id: "suggested-hubs-points",
             data: suggestedHubs,
             getPosition: (d) => [d.longitude, d.latitude],
-            getRadius: 150,
+            getRadius: 30,
             getFillColor: [83, 19, 30, 200],
             pickable: true,
           }),
@@ -375,23 +383,21 @@ function MapComponent() {
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
-      <Map
-        initialViewState={INITIAL_VIEW_STATE}
-        style={{ width: "100%", height: "100%" }}
-        mapStyle={mapStyle}
-        attributionControl={false}
-        hash={true}
-        // interactiveLayerIds={["navigation-control"]} // Ensure the map is interactive
-      >
-        <DeckGLOverlay layers={layers} getTooltip={getTooltip} interleaved />
-        <NavigationControl position="top-right" style={{ zIndex: 1 }} />
-        <AttributionControl
-          customAttribution="Barikoi"
-          position="bottom-right"
-          style={{ zIndex: 1 }}
-        />
-      </Map>
-
+      <DeckGL initialViewState={INITIAL_VIEW_STATE} controller layers={layers}>
+        <Map
+          style={{ width: "100%", height: "100%" }}
+          mapStyle={mapStyle}
+          attributionControl={false}
+          hash={true}
+          // interactiveLayerIds={["navigation-control"]} // Ensure the map is interactive
+        >
+          <AttributionControl
+            customAttribution="Barikoi"
+            position="bottom-right"
+            style={{ zIndex: 1 }}
+          />
+        </Map>
+      </DeckGL>
       <div className="absolute bottom-2 md:bottom-2 left-2 md:left-2 z-[1000]">
         <Image
           src={bkoiLogo}
