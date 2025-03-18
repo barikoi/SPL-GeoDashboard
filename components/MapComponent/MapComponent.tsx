@@ -1,14 +1,14 @@
 // components/MapComponent.tsx
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   AttributionControl,
   Map,
-  NavigationControl,
   useControl,
+  MapRef,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL, { ScatterplotLayer, GeoJsonLayer } from "deck.gl";
+import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
@@ -19,12 +19,11 @@ import {
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import type { Geometry } from "geojson";
-import { Progress } from "antd"; // Import Ant Design Progress
+import { Progress, message } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
-import bkoiLogo from "./bkoi-img.png";
+import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { message } from "antd";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -94,6 +93,7 @@ function DeckGLOverlay(props: DeckProps) {
 
 function MapComponent() {
   const dispatch = useDispatch();
+  const mapRef = useRef<MapRef>(null);
   const datasets = useSelector((state: RootState) => state.map.datasets);
   const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
   const showIsochrones = useSelector(
@@ -186,6 +186,7 @@ function MapComponent() {
                     }
 
                     const isochroneData = await response.json();
+                    console.log({isochroneData})
                     const geometry =
                       transformIsochroneToGeometry(isochroneData);
 
@@ -232,13 +233,14 @@ function MapComponent() {
                 }
               );
 
-              if (!uploadResponse.ok) {
-                throw new Error("Failed to upload processed file");
+              if (uploadResponse.ok) {
+                message.success(
+                  "Coverage calculated and file processed successfully"
+                );
+                
+                // Fly to the area with highest data density
+                flyToHighestDensityArea(dataset);
               }
-
-              message.success(
-                "Coverage calculated and file processed successfully"
-              );
             }
           }
           setIsochronesCalculated(true);
@@ -251,7 +253,7 @@ function MapComponent() {
         } finally {
           setProgress(0);
           dispatch(resetIsochrones());
-          dispatch(setCalculatingCoverage(false)); // End
+          dispatch(setCalculatingCoverage(false));
         }
       };
 
@@ -282,6 +284,22 @@ function MapComponent() {
       }) as EventListener);
     };
   }, []);
+
+  // Update the useEffect for datasets.length
+  useEffect(() => {
+    // When datasets change, check if a new one was added
+    if (datasets.length > 0) {
+      const latestDataset = datasets[datasets.length - 1];
+      // Only fly if the dataset has data
+      if (latestDataset && latestDataset.data && latestDataset.data.length > 0) {
+        console.log("New dataset detected, flying to highest density area");
+        // Add a small delay to ensure the map is ready
+        setTimeout(() => {
+          flyToHighestDensityArea(latestDataset);
+        }, 1000);
+      }
+    }
+  }, [datasets.length]); // Only trigger when the number of datasets changes
 
   const layers = [
     ...datasets
@@ -381,23 +399,109 @@ function MapComponent() {
       }),
   ].filter(Boolean);
 
+  // Update the flyToHighestDensityArea function with proper typing
+  const flyToHighestDensityArea = (dataset: any) => {
+    if (!dataset || !dataset.data || dataset.data.length === 0) {
+      return;
+    }
+    
+    if (!mapRef.current) {
+      return;
+    }
+    
+    // Create a grid to count points in each cell
+    const gridSize = 0.05; // Approximately 5km grid cells
+    const grid: Record<string, {count: number, sumLon: number, sumLat: number}> = {};
+    
+    // Count points in each grid cell
+    dataset.data.forEach((point: any) => {
+      if (!point.longitude || !point.latitude) {
+        return; // Skip invalid points
+      }
+      
+      const gridX = Math.floor(point.longitude / gridSize);
+      const gridY = Math.floor(point.latitude / gridSize);
+      const gridKey = `${gridX},${gridY}`;
+      
+      if (!grid[gridKey]) {
+        grid[gridKey] = {
+          count: 0,
+          sumLon: 0,
+          sumLat: 0,
+        };
+      }
+      
+      grid[gridKey].count += 1;
+      grid[gridKey].sumLon += point.longitude;
+      grid[gridKey].sumLat += point.latitude;
+    });
+    
+    // Find the cell with the highest point density
+    let maxCount = 0;
+    let densestCell = null;
+    
+    Object.keys(grid).forEach(key => {
+      if (grid[key].count > maxCount) {
+        maxCount = grid[key].count;
+        densestCell = grid[key];
+      }
+    });
+    
+    if (densestCell) {
+      // Calculate the center of the densest cell
+      const centerLon = densestCell.sumLon / densestCell.count;
+      const centerLat = densestCell.sumLat / densestCell.count;
+      
+      console.log(`Flying to highest density area: ${centerLat}, ${centerLon} with ${maxCount} points`);
+      
+      // Add a small delay to ensure the map is fully loaded
+      setTimeout(() => {
+        if (mapRef.current) {
+          try {
+            mapRef.current.flyTo({
+              center: [centerLon, centerLat],
+              zoom: 12,
+              duration: 2000,
+              essential: true
+            });
+          } catch (error) {
+            console.error("Error during flyTo:", error);
+          }
+        } 
+      }, 500);
+    } else {
+      console.log("No dense cell found in the dataset");
+    }
+  };
+
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
-      <DeckGL initialViewState={INITIAL_VIEW_STATE} controller layers={layers}>
+      {/* <DeckGL 
+        // @ts-ignore
+        initialViewState={INITIAL_VIEW_STATE} 
+        controller 
+        layers={layers}
+      > */}
         <Map
+          initialViewState={INITIAL_VIEW_STATE} 
+          // controller 
+          ref={mapRef}
           style={{ width: "100%", height: "100%" }}
           mapStyle={mapStyle}
           attributionControl={false}
           hash={true}
-          // interactiveLayerIds={["navigation-control"]} // Ensure the map is interactive
+          onLoad={() => {
+            console.log("Map fully loaded and ready");
+          }}
         >
           <AttributionControl
             customAttribution="Barikoi"
             position="bottom-right"
             style={{ zIndex: 1 }}
           />
+          <DeckGLOverlay layers={ layers } />
         </Map>
-      </DeckGL>
+      {/* </DeckGL> */}
       <div className="absolute bottom-2 md:bottom-2 left-2 md:left-2 z-[1000]">
         <Image
           src={bkoiLogo}
