@@ -1,4 +1,5 @@
 import { DataPoint } from "@/types/leftPanelTypes";
+import type { Geometry } from "geojson";
 
 export const getRandomColor = (): [number, number, number] => {
   const colors: [number, number, number][] = [
@@ -26,10 +27,7 @@ export const parseString = (data: string): any => {
   }
 };
 
-export const normalizeData = (
-  data: Record<string, any>[],
-  fileType: "csv" | "json"
-): DataPoint[] => {
+export const normalizeData = ( data: Record<string, any>[], fileType: "csv" | "json"): DataPoint[] => {
   if (fileType === "csv") {
     return data.map((row) => ({
       latitude: parseFloat(String(row.latitude)),
@@ -50,6 +48,7 @@ export const normalizeData = (
     }));
   } else if (fileType === "json") {
     if ("features" in data) {
+      // @ts-ignore
       return data.features.map((feature: any) => ({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
@@ -73,4 +72,17 @@ export const normalizeData = (
     }
   }
   return [];
+};
+
+export const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
+  if (!isochrone || !isochrone.polygons || !Array.isArray(isochrone.polygons)) {
+    console.error("Invalid isochrone data:", isochrone);
+    return null;
+  }
+
+  // Return just the first polygon's geometry (assuming we want the main isochrone)
+  return {
+    type: "Polygon",
+    coordinates: isochrone.polygons[0].geometry.coordinates,
+  };
 };

@@ -8,7 +8,7 @@ import {
   MapRef,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps } from "deck.gl";
+import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
@@ -18,12 +18,12 @@ import {
   setCalculatingCoverage,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import type { Geometry } from "geojson";
 import { Progress, message } from "antd"; // Import Ant Design Progress
 import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
+import { transformIsochroneToGeometry } from "@/utils/localUtils";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -63,25 +63,14 @@ interface PopulationPoint {
 
 // Helper function to transform isochrone data to GeoJSON
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
-  if (!isochrone || !isochrone.polygons || !Array.isArray(isochrone.polygons)) {
-    console.error("Invalid isochrone data:", isochrone);
-    return null;
-  }
 
-  // Return just the first polygon's geometry (assuming we want the main isochrone)
-  return {
-    type: "Polygon",
-    coordinates: isochrone.polygons[0].geometry.coordinates,
-  };
-};
 
 // Update the hover info type
 interface HoverInfo {
   object: any;
   x: number;
   y: number;
-  type: "point" | "hexagon" | "suggested";
+  type: "point" | "hexagon" | "suggested" | "HeatmapLayer";
 }
 
 // Add DeckGLOverlay component
@@ -99,6 +88,7 @@ function MapComponent() {
   const showIsochrones = useSelector(
     (state: RootState) => state.map.showIsochrones
   );
+  console.log({showIsochrones})
   const suggestedHubs = useSelector(
     (state: RootState) => state.map.suggestedHubs
   );
@@ -116,6 +106,7 @@ function MapComponent() {
     []
   );
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
+  console.log({isochroneLayers})
 
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
@@ -154,6 +145,7 @@ function MapComponent() {
 
   // Fix useEffect dependencies
   useEffect(() => {
+    console.log({isochrones, datasets })
     const updatedIsochrones = isochrones.filter((isochrone) =>
       datasets.some((dataset) => dataset.id === isochrone.datasetId)
     );
@@ -186,9 +178,7 @@ function MapComponent() {
                     }
 
                     const isochroneData = await response.json();
-                    console.log({isochroneData})
-                    const geometry =
-                      transformIsochroneToGeometry(isochroneData);
+                    const geometry = transformIsochroneToGeometry(isochroneData);
 
                     return {
                       ...point,
@@ -264,12 +254,13 @@ function MapComponent() {
   // Add useEffect to listen for population file changes
   useEffect(() => {
     const handlePopulationData = (data: PopulationPoint[]) => {
-      const points = data
+      const points:any = data
         .filter((row) => row.Latitude && row.Longitude)
         .map((row) => [
           parseFloat(String(row.Longitude)),
           parseFloat(String(row.Latitude)),
         ]);
+        console.log({points})
       setPopulationPoints(points);
     };
 
@@ -288,11 +279,10 @@ function MapComponent() {
   // Update the useEffect for datasets.length
   useEffect(() => {
     // When datasets change, check if a new one was added
-    if (datasets.length > 0) {
+    if (datasets.length > 0 && !showIsochrones) {
       const latestDataset = datasets[datasets.length - 1];
       // Only fly if the dataset has data
       if (latestDataset && latestDataset.data && latestDataset.data.length > 0) {
-        console.log("New dataset detected, flying to highest density area");
         // Add a small delay to ensure the map is ready
         setTimeout(() => {
           flyToHighestDensityArea(latestDataset);
@@ -300,6 +290,8 @@ function MapComponent() {
       }
     }
   }, [datasets.length]); // Only trigger when the number of datasets changes
+
+  console.log({populationPoints})
 
   const layers = [
     ...datasets
@@ -354,49 +346,88 @@ function MapComponent() {
       : []),
     populationLayerVisible &&
       // Only show population layer if no suggested hubs
-      new HexagonLayer({
-        id: "population-hexagon",
+      // new HexagonLayer({
+      //   id: "population-hexagon",
+      //   data: populationPoints,
+      //   getPosition: (d) => d,
+      //   radius: 500,
+      //   elevationScale: 20,
+      //   pickable: true,
+      //   extruded: true,
+      //   colorRange: [
+      //     [237, 248, 125], // Light Yellow (Low population)
+      //     [254, 192, 206], // Light Teal
+      //     [227, 135, 158], // Teal
+      //     [209, 131, 201], // Medium Dark Blue
+      //     [139, 95, 191], // Dark Blue
+      //     [100, 58, 113], // Very Dark Blue (High population)
+      //   ],
+
+      //   coverage: 1,
+      //   upperPercentile: 100,
+      //   material: {
+      //     ambient: 0.64,
+      //     diffuse: 0.6,
+      //     shininess: 32,
+      //     specularColor: [51, 51, 51],
+      //   },
+      //   transitions: {
+      //     elevationScale: 500,
+      //   },
+      //   autoHighlight: true,
+      //   highlightColor: [255, 255, 255, 100],
+      //   // @ts-ignore
+      //   onHover: (info: any) => {
+      //     console.log({ info: info})
+      //     if (info.object) {
+      //       setHoverInfo({
+      //         object: info.object,
+      //         x: info.x,
+      //         y: info.y,
+      //         type: "hexagon",
+      //       });
+      //     } else {
+      //       setHoverInfo(null); // Clear hover info when not hovering
+      //     }
+      //   },
+      // }),
+      new HeatmapLayer({
+        id: 'HeatmapLayer',
         data: populationPoints,
-        getPosition: (d) => d,
-        radius: 500,
-        elevationScale: 20,
+        aggregation: 'SUM',
+        getPosition: (d: any) => d,
+        getWeight: (d: any) => 10,
+        radiusPixels: 25,
         pickable: true,
-        extruded: true,
-        colorRange: [
+        colorRange: isNightMode ? [
           [237, 248, 125], // Light Yellow (Low population)
           [254, 192, 206], // Light Teal
           [227, 135, 158], // Teal
           [209, 131, 201], // Medium Dark Blue
           [139, 95, 191], // Dark Blue
           [100, 58, 113], // Very Dark Blue (High population)
+        ] : [
+          [100, 150, 255], // Blue (Low population)
+          [0, 128, 255], // Light Blue
+          [0, 255, 255], // Cyan
+          [255, 0, 0], // Red
+          [255, 0, 128], // Pink
+          [255, 0, 255] // Magenta (High population)
         ],
-
-        coverage: 1,
-        upperPercentile: 100,
-        material: {
-          ambient: 0.64,
-          diffuse: 0.6,
-          shininess: 32,
-          specularColor: [51, 51, 51],
-        },
-        transitions: {
-          elevationScale: 500,
-        },
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 100],
-        onHover: (info: any) => {
-          if (info.object) {
+        // @ts-ignore
+        onHover: (info:any) => {
+          if (info.layer.count) {
             setHoverInfo({
-              object: info.object,
+              object: { count: info.layer.count},
               x: info.x,
               y: info.y,
-              type: "hexagon",
+              type: "HeatmapLayer"
             });
           } else {
-            setHoverInfo(null); // Clear hover info when not hovering
+            setHoverInfo(null);
           }
-        },
-      }),
+        }
+      })
   ].filter(Boolean);
 
   // Update the flyToHighestDensityArea function with proper typing
@@ -490,9 +521,6 @@ function MapComponent() {
           mapStyle={mapStyle}
           attributionControl={false}
           hash={true}
-          onLoad={() => {
-            console.log("Map fully loaded and ready");
-          }}
         >
           <AttributionControl
             customAttribution="Barikoi"
@@ -526,7 +554,7 @@ function MapComponent() {
           className="absolute z-10 pointer-events-none bg-white p-2 md:p-4 rounded-lg shadow-md text-sm md:text-base"
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
         >
-          {hoverInfo.type === "hexagon" ? (
+          {hoverInfo.type === "HeatmapLayer" ? (
             <div className="space-y-1">
               <div className="font-semibold text-gray-800">
                 Population Density

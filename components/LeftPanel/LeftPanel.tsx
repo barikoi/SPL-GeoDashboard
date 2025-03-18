@@ -86,6 +86,7 @@ const LeftPanel = () => {
     return Object.keys(data[0]).some((key) => key.toLowerCase() === "coverage");
   };
 
+  // Hub Locations uploaded file
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !files[0]) {
@@ -102,17 +103,14 @@ const LeftPanel = () => {
         const content = e.target.result as string;
         const id = `dataset-${Date.now()}`;
         const color = getRandomColor();
-        const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [
-          number,
-          number,
-          number
-        ];
+        const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [ number, number, number ];
 
         if (file.name.endsWith(".csv")) {
           Papa.parse(content, {
             header: true,
             dynamicTyping: true,
             complete: (result) => {
+              // result output : data, errors and meta
               const hasCoverage = checkForCoverageColumn(result.data);
               setHasCoverageColumn(hasCoverage);
               const normalizedData = normalizeData(result.data, "csv");
@@ -175,12 +173,6 @@ const LeftPanel = () => {
         Papa.parse(e.target.result as string, {
           header: true,
           complete: (results) => {
-            console.log("Population Data:", {
-              data: results.data,
-              totalRows: results.data.length,
-              fields: results.meta.fields,
-            });
-
             // Validate data structure
             const sampleRow = results.data[0];
 
@@ -225,11 +217,11 @@ const LeftPanel = () => {
     setIsCalculating(true);
     setUploadProgress(0);
 
+    console.log({datasets})
+
     try {
       // Get the dataset with coverage (either from file or calculated)
-      const dataset = hasCoverageColumn
-        ? datasets[0]
-        : datasets.find((d) => d.hasIsochrones);
+      const dataset = hasCoverageColumn ? datasets[0] : datasets.find((d) => d.hasIsochrones);
       if (!dataset) {
         throw new Error("No dataset with coverage found");
       }
@@ -558,7 +550,7 @@ const LeftPanel = () => {
 
           <div className="flex space-x-2">
             <button
-              onClick={() => dispatch(showIsochrones())}
+              onClick={() => dispatch(showIsochrones(true))}
               disabled={isCalculatingCoverage}
               className={`flex-1 py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center ${
                 isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""

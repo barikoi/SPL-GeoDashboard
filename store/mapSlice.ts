@@ -82,8 +82,8 @@ const mapSlice = createSlice({
       state.timeLimit = action.payload; // Update timeLimit
       state.showIsochrones = false;
     },
-    showIsochrones: (state) => {
-      state.showIsochrones = true; // Add a new state property
+    showIsochrones: (state, action) => {
+      state.showIsochrones = action.payload; // Add a new state property
     },
     updateDatasetWithIsochrones: (
       state,
