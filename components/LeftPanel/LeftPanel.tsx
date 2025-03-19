@@ -12,6 +12,8 @@ import {
   setSuggestedHubs,
   togglePopulationLayer,
   toggleNightMode,
+  setDeckglLayer,
+  toggleBuildingShow
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -24,8 +26,8 @@ import {
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "../../app/images/SPL_Logo.webp";
-import { Progress, message, Spin, Tooltip, Switch } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { Progress, message, Spin, Tooltip, Switch, Radio } from "antd";
+import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
 
@@ -55,30 +57,43 @@ const downloadCSV = (dataset: {
 
 const LeftPanel = () => {
   const dispatch = useDispatch();
-  const datasets = useSelector((state: RootState) => state.map.datasets);
-  console.log({datasets})
-  const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
+
+  // Local States
   const [fileUploaded, setFileUploaded] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [populationFile, setPopulationFile] = useState<File | null>(null);
-  const [suggestedHubsCount, setSuggestedHubsCount] = useState<number | null>(
-    null
-  );
+  const [suggestedHubsCount, setSuggestedHubsCount] = useState<number | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [hasCoverageColumn, setHasCoverageColumn] = useState<boolean>(false);
 
+  // Redux States
+  const datasets = useSelector((state: RootState) => state.map.datasets);
+  const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
-  const populationLayerVisible = useSelector(
-    (state: RootState) => state.map.populationLayerVisible
-  );
+  const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
+  const isCalculatingCoverage = useSelector((state: RootState) => state.map.isCalculatingCoverage);
+  const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
 
-  const isCalculatingCoverage = useSelector(
-    (state: RootState) => state.map.isCalculatingCoverage
-  );
+  const options: CheckboxGroupProps<string>['options'] = [
+    { 
+      label: 'Hexgonlayer', 
+      value: 'Hexgonlayer',
+      style: { color: isNightMode ? '#f9fafb' : '#374151' }
+    },
+    { 
+      label: 'Heatmaplayer', 
+      value: 'Heatmaplayer',
+      style: { color: isNightMode ? '#f9fafb' : '#374151' }
+    },
+  ];
 
   const handleToggleMapStyle = (checked: boolean) => {
     dispatch(toggleNightMode()); // Dispatch the action to toggle night mode
+  };
+  
+  const handleToggleBuildingShow = (checked: boolean) => {
+    dispatch(toggleBuildingShow()); // Dispatch the action to toggle night mode
   };
 
   const checkForCoverageColumn = (data: any[]): boolean => {
@@ -335,6 +350,11 @@ const LeftPanel = () => {
     }
   };
 
+  const onLayerChange = (e:any) => {
+    const layer = e.target.value
+    dispatch(setDeckglLayer(layer))
+  }
+
   // Change this condition
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
@@ -384,6 +404,31 @@ const LeftPanel = () => {
             checkedChildren="🌙"
             unCheckedChildren="☀️"
           />
+        </div>
+      </div>
+
+      {/* Hide building layer */}
+      <div
+        className={`mb-4 p-3 rounded-lg shadow-sm ${
+          isNightMode ? "bg-gray-700" : "bg-white"
+        }`}
+      >
+        <div className="flex justify-between items-center">
+          <span className={`text-xs md:text-sm font-semibold ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}>
+            {isShowBuilding ? "Hide Buildings" : "Show Buildings"}
+          </span>
+          <button
+            onClick={() => dispatch(toggleBuildingShow())}
+            className={`p-1.5 rounded-full ${
+              isNightMode 
+                ? "text-gray-300 bg-gray-600 hover:bg-gray-500" 
+                : "text-gray-700 bg-gray-100 hover:bg-gray-200"
+            } hover:text-blue-500 transition-colors`}
+          >
+            {isShowBuilding ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
+          </button>
         </div>
       </div>
 
@@ -583,6 +628,19 @@ const LeftPanel = () => {
           >
             Population Coverage
           </h2>
+
+          {
+            populationFile && (
+              <div className="py-2">
+                <Radio.Group 
+                  onChange={onLayerChange} 
+                  block 
+                  options={options} 
+                  defaultValue="Hexgonlayer" 
+                />
+              </div>
+            )
+          }
 
           <div className="mb-2">
             <input

@@ -34,6 +34,8 @@ interface MapState {
   populationLayerVisible: boolean;
   isNightMode: boolean;
   isCalculatingCoverage: boolean;
+  deckglLayer: 'Hexgonlayer' | 'Heatmaplayer',
+  isShowBuilding: boolean;
 }
 
 const initialState: MapState = {
@@ -46,6 +48,8 @@ const initialState: MapState = {
   populationLayerVisible: true,
   isNightMode: false,
   isCalculatingCoverage: false,
+  deckglLayer: 'Hexgonlayer',
+  isShowBuilding: false,
 };
 
 const mapSlice = createSlice({
@@ -127,6 +131,12 @@ const mapSlice = createSlice({
     setCalculatingCoverage: (state, action: PayloadAction<boolean>) => {
       state.isCalculatingCoverage = action.payload;
     },
+    setDeckglLayer: (state, action) => {
+      state.deckglLayer = action.payload;
+    },
+    toggleBuildingShow: (state) => {
+      state.isShowBuilding = !state.isShowBuilding; 
+    },
   },
 });
 
@@ -145,5 +155,7 @@ export const {
   togglePopulationLayer,
   toggleNightMode,
   setCalculatingCoverage,
+  setDeckglLayer,
+  toggleBuildingShow
 } = mapSlice.actions;
 export default mapSlice.reducer;

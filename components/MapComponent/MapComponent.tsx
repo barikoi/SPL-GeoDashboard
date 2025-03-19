@@ -18,12 +18,13 @@ import {
   setCalculatingCoverage,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import { Progress, message } from "antd"; // Import Ant Design Progress
+import { Progress, message } from "antd"; 
 import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
 import { transformIsochroneToGeometry } from "@/utils/localUtils";
+import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -32,46 +33,6 @@ const INITIAL_VIEW_STATE = {
   pitch: 60,
   bearing: 20,
 };
-
-// Add proper type for the isochrone data
-interface IsochroneData {
-  data: {
-    polygons: Array<{
-      geometry: {
-        coordinates: number[][][];
-      };
-    }>;
-  };
-  datasetId: string;
-}
-
-// Add this type definition
-interface DataPoint {
-  latitude: number;
-  longitude: number;
-  properties: Record<string, unknown>;
-  geojson: string;
-  coverage?: any; // Coverage polygon data
-}
-
-// Add this interface at the top with other interfaces
-interface PopulationPoint {
-  Latitude: number;
-  Longitude: number;
-  CityNameEn: string;
-}
-
-// Helper function to transform isochrone data to GeoJSON
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-
-
-// Update the hover info type
-interface HoverInfo {
-  object: any;
-  x: number;
-  y: number;
-  type: "point" | "hexagon" | "suggested" | "HeatmapLayer";
-}
 
 // Add DeckGLOverlay component
 function DeckGLOverlay(props: DeckProps) {
@@ -83,18 +44,16 @@ function DeckGLOverlay(props: DeckProps) {
 function MapComponent() {
   const dispatch = useDispatch();
   const mapRef = useRef<MapRef>(null);
+
+  // Redux States
   const datasets = useSelector((state: RootState) => state.map.datasets);
   const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
-  const showIsochrones = useSelector(
-    (state: RootState) => state.map.showIsochrones
-  );
-  console.log({showIsochrones})
-  const suggestedHubs = useSelector(
-    (state: RootState) => state.map.suggestedHubs
-  );
-  const populationLayerVisible = useSelector(
-    (state: RootState) => state.map.populationLayerVisible
-  );
+  const showIsochrones = useSelector((state: RootState) => state.map.showIsochrones);
+  const suggestedHubs = useSelector((state: RootState) => state.map.suggestedHubs);
+  const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
+  const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
+  const deckglLayer = useSelector((state: RootState) => state.map.deckglLayer);
+  const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
 
   // Remove the redux hover info and use local state
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -105,12 +64,12 @@ function MapComponent() {
   const [populationPoints, setPopulationPoints] = useState<[number, number][]>(
     []
   );
-  const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
-  console.log({isochroneLayers})
 
+  // Toggle the modes
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
     : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
+
   // Update the tooltip handler
   const getTooltip = (info: PickingInfo) => {
     const { object, x, y } = info;
@@ -145,7 +104,6 @@ function MapComponent() {
 
   // Fix useEffect dependencies
   useEffect(() => {
-    console.log({isochrones, datasets })
     const updatedIsochrones = isochrones.filter((isochrone) =>
       datasets.some((dataset) => dataset.id === isochrone.datasetId)
     );
@@ -234,9 +192,9 @@ function MapComponent() {
             }
           }
           setIsochronesCalculated(true);
-          message.success(
-            "Coverage calculated and file processed successfully"
-          );
+          // message.success(
+          //   "Coverage calculated and file processed successfully"
+          // );
         } catch (error) {
           console.error("Error in fetchIsochrones:", error);
           message.error("Failed to process coverage data");
@@ -291,7 +249,7 @@ function MapComponent() {
     }
   }, [datasets.length]); // Only trigger when the number of datasets changes
 
-  console.log({populationPoints})
+  console.log({deckglLayer})
 
   const layers = [
     ...datasets
@@ -346,52 +304,52 @@ function MapComponent() {
       : []),
     populationLayerVisible &&
       // Only show population layer if no suggested hubs
-      // new HexagonLayer({
-      //   id: "population-hexagon",
-      //   data: populationPoints,
-      //   getPosition: (d) => d,
-      //   radius: 500,
-      //   elevationScale: 20,
-      //   pickable: true,
-      //   extruded: true,
-      //   colorRange: [
-      //     [237, 248, 125], // Light Yellow (Low population)
-      //     [254, 192, 206], // Light Teal
-      //     [227, 135, 158], // Teal
-      //     [209, 131, 201], // Medium Dark Blue
-      //     [139, 95, 191], // Dark Blue
-      //     [100, 58, 113], // Very Dark Blue (High population)
-      //   ],
-
-      //   coverage: 1,
-      //   upperPercentile: 100,
-      //   material: {
-      //     ambient: 0.64,
-      //     diffuse: 0.6,
-      //     shininess: 32,
-      //     specularColor: [51, 51, 51],
-      //   },
-      //   transitions: {
-      //     elevationScale: 500,
-      //   },
-      //   autoHighlight: true,
-      //   highlightColor: [255, 255, 255, 100],
-      //   // @ts-ignore
-      //   onHover: (info: any) => {
-      //     console.log({ info: info})
-      //     if (info.object) {
-      //       setHoverInfo({
-      //         object: info.object,
-      //         x: info.x,
-      //         y: info.y,
-      //         type: "hexagon",
-      //       });
-      //     } else {
-      //       setHoverInfo(null); // Clear hover info when not hovering
-      //     }
-      //   },
-      // }),
-      new HeatmapLayer({
+      (deckglLayer === "Hexgonlayer" ? 
+      [new HexagonLayer({
+        id: "population-hexagon",
+        data: populationPoints,
+        getPosition: (d) => d,
+        radius: 500,
+        elevationScale: 20,
+        pickable: true,
+        extruded: true,
+        colorRange: [
+          [237, 248, 125], // Light Yellow (Low population)
+          [254, 192, 206], // Light Teal
+          [227, 135, 158], // Teal
+          [209, 131, 201], // Medium Dark Blue
+          [139, 95, 191], // Dark Blue
+          [100, 58, 113], // Very Dark Blue (High population)
+        ],
+        coverage: 1,
+        upperPercentile: 100,
+        material: {
+          ambient: 0.64,
+          diffuse: 0.6,
+          shininess: 32,
+          specularColor: [51, 51, 51],
+        },
+        transitions: {
+          elevationScale: 500,
+        },
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 100],
+        // @ts-ignore
+        onHover: (info: any) => {
+          console.log({ info: info})
+          if (info.object) {
+            setHoverInfo({
+              object: info.object,
+              x: info.x,
+              y: info.y,
+              type: "hexagon",
+            });
+          } else {
+            setHoverInfo(null); // Clear hover info when not hovering
+          }
+        },
+      })]:
+      [new HeatmapLayer({
         id: 'HeatmapLayer',
         data: populationPoints,
         aggregation: 'SUM',
@@ -427,7 +385,7 @@ function MapComponent() {
             setHoverInfo(null);
           }
         }
-      })
+      })])
   ].filter(Boolean);
 
   // Update the flyToHighestDensityArea function with proper typing
@@ -505,6 +463,60 @@ function MapComponent() {
     }
   };
 
+  // Building showcasing by mainpuating map layers
+  useEffect(() => {
+    // Function to toggle building layers visibility
+    const toggleBuildingLayers = () => {
+      if (!mapRef.current) return;
+      
+      const map = mapRef.current.getMap();
+      
+      // List of building layers to toggle
+      const buildingLayers = ['building', 'building-commercial', 'building-3d', 'building-3d-commercial', 'building-ada', 'building-metro'];
+      
+      // Set visibility based on isShowBuilding state (inverse logic as requested)
+      const visibility = isShowBuilding ? 'none' : 'visible';
+      
+      buildingLayers.forEach(layerId => {
+        try {
+          if (map.getLayer(layerId)) {
+            map.setLayoutProperty(layerId, 'visibility', visibility);
+          }
+        } catch (error) {
+          console.error(`Error toggling layer ${layerId}:`, error);
+        }
+      });
+    };
+
+    // Try immediately
+    if (mapRef.current && mapRef.current.getMap()) {
+      const map = mapRef.current.getMap();
+      
+      if (map.isStyleLoaded()) {
+        toggleBuildingLayers();
+      } else {
+        // If not loaded, set up event listeners
+        map.once('style.load', toggleBuildingLayers);
+        map.once('idle', toggleBuildingLayers); // Additional safety
+      }
+    }
+    
+    // Set up a delayed attempt as a fallback
+    const timeoutId = setTimeout(() => {
+      toggleBuildingLayers();
+    }, 2000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      // Clean up event listeners if component unmounts
+      if (mapRef.current && mapRef.current.getMap()) {
+        const map = mapRef.current.getMap();
+        map.off('style.load', toggleBuildingLayers);
+        map.off('idle', toggleBuildingLayers);
+      }
+    };
+  }, [mapStyle, isShowBuilding]); // Re-run when mapStyle or isShowBuilding changes
+
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
       {/* <DeckGL 
@@ -554,7 +566,7 @@ function MapComponent() {
           className="absolute z-10 pointer-events-none bg-white p-2 md:p-4 rounded-lg shadow-md text-sm md:text-base"
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
         >
-          {hoverInfo.type === "HeatmapLayer" ? (
+          {(hoverInfo.type === "HeatmapLayer" || hoverInfo.type === "hexagon") ? (
             <div className="space-y-1">
               <div className="font-semibold text-gray-800">
                 Population Density
