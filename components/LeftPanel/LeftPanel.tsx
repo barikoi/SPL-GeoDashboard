@@ -73,7 +73,6 @@ const LeftPanel = () => {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
   const isCalculatingCoverage = useSelector((state: RootState) => state.map.isCalculatingCoverage);
-  const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
 
   const options: CheckboxGroupProps<string>['options'] = [
     { 
@@ -90,10 +89,6 @@ const LeftPanel = () => {
 
   const handleToggleMapStyle = (checked: boolean) => {
     dispatch(toggleNightMode()); // Dispatch the action to toggle night mode
-  };
-  
-  const handleToggleBuildingShow = (checked: boolean) => {
-    dispatch(toggleBuildingShow()); // Dispatch the action to toggle night mode
   };
 
   const checkForCoverageColumn = (data: any[]): boolean => {
@@ -337,7 +332,9 @@ const LeftPanel = () => {
 
       if (data.message === "success") {
         dispatch(setSuggestedHubs(data.suggested_hubs));
-        dispatch(togglePopulationLayer(false));
+        if (populationLayerVisible) {
+          dispatch(togglePopulationLayer()); 
+        }
         setSuggestedHubsCount(data.suggested_hubs.length);
         message.success("Successfully loaded suggested hubs");
       }
@@ -404,31 +401,6 @@ const LeftPanel = () => {
             checkedChildren="🌙"
             unCheckedChildren="☀️"
           />
-        </div>
-      </div>
-
-      {/* Hide building layer */}
-      <div
-        className={`mb-4 p-3 rounded-lg shadow-sm ${
-          isNightMode ? "bg-gray-700" : "bg-white"
-        }`}
-      >
-        <div className="flex justify-between items-center">
-          <span className={`text-xs md:text-sm font-semibold ${
-            isNightMode ? "text-gray-200" : "text-gray-700"
-          }`}>
-            {isShowBuilding ? "Hide Buildings" : "Show Buildings"}
-          </span>
-          <button
-            onClick={() => dispatch(toggleBuildingShow())}
-            className={`p-1.5 rounded-full ${
-              isNightMode 
-                ? "text-gray-300 bg-gray-600 hover:bg-gray-500" 
-                : "text-gray-700 bg-gray-100 hover:bg-gray-200"
-            } hover:text-blue-500 transition-colors`}
-          >
-            {isShowBuilding ? <FaEyeSlash size={14} /> : <FaEye size={14} />}
-          </button>
         </div>
       </div>
 

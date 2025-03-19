@@ -6,6 +6,8 @@ import {
   Map,
   useControl,
   MapRef,
+  FullscreenControl,
+  NavigationControl,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer } from "deck.gl";
@@ -16,6 +18,7 @@ import {
   updateDatasetWithIsochrones,
   resetIsochrones,
   setCalculatingCoverage,
+  toggleBuildingShow,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Progress, message } from "antd"; 
@@ -25,6 +28,9 @@ import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
 import { transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
+import { TbHexagon3D } from "react-icons/tb";
+import MapControlButton from "./MapControlButton";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -61,14 +67,21 @@ function MapComponent() {
   const [progress, setProgress] = useState(0);
   const [isochronesCalculated, setIsochronesCalculated] = useState(false);
   const [isochroneLayers, setIsochroneLayers] = useState<any[]>([]);
-  const [populationPoints, setPopulationPoints] = useState<[number, number][]>(
-    []
-  );
+  const [populationPoints, setPopulationPoints] = useState<[number, number][]>([]);
+  const [is3DMode, setIs3DMode] = useState(false);
 
   // Toggle the modes
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
     : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
+  
+  const handleToggle3DMode = () => {
+    setIs3DMode(!is3DMode);
+    const map = mapRef.current;
+    if (map) {
+      map.setPitch(is3DMode ? 60 : 0);
+    }
+  }
 
   // Update the tooltip handler
   const getTooltip = (info: PickingInfo) => {
@@ -182,9 +195,7 @@ function MapComponent() {
               );
 
               if (uploadResponse.ok) {
-                message.success(
-                  "Coverage calculated and file processed successfully"
-                );
+                message.success({content: "Coverage calculated and file processed successfully", key: "covergae-calculte", duration: 15});
                 
                 // Fly to the area with highest data density
                 flyToHighestDensityArea(dataset);
@@ -192,9 +203,6 @@ function MapComponent() {
             }
           }
           setIsochronesCalculated(true);
-          // message.success(
-          //   "Coverage calculated and file processed successfully"
-          // );
         } catch (error) {
           console.error("Error in fetchIsochrones:", error);
           message.error("Failed to process coverage data");
@@ -248,8 +256,6 @@ function MapComponent() {
       }
     }
   }, [datasets.length]); // Only trigger when the number of datasets changes
-
-  console.log({deckglLayer})
 
   const layers = [
     ...datasets
@@ -539,6 +545,24 @@ function MapComponent() {
             position="bottom-right"
             style={{ zIndex: 1 }}
           />
+          <FullscreenControl />
+          <NavigationControl position="top-right" />
+          <div
+            style={typeof window !== 'undefined' && window.screen.width > 350 ? { ...Style } : { ...Style }}
+          >
+            <MapControlButton
+              title={is3DMode ? "Switch to 3D" : "Switch to 2D"}
+              onClick={handleToggle3DMode}
+              icon={<TbHexagon3D color="#333333" />}
+              isActive={is3DMode}
+            />
+            <MapControlButton
+              title={isShowBuilding ? "Hide Buildings" : "Show Buildings"}
+              onClick={() => dispatch(toggleBuildingShow())}
+              icon={isShowBuilding ? <FaEyeSlash  color="#333333" /> : <FaEye  color="#333333" />}
+              isActive={isShowBuilding}
+            />
+          </div>
           <DeckGLOverlay layers={ layers } />
         </Map>
       {/* </DeckGL> */}
@@ -587,3 +611,11 @@ function MapComponent() {
 }
 
 export default MapComponent;
+
+const Style = {
+  position: 'absolute' as const,
+  top: 145,
+  right: 10,
+  background: 'none',
+  zIndex: 9999,
+};
