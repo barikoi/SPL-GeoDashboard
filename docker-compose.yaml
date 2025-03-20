@@ -1,0 +1,11 @@
+version: '3.7'
+services:
+  spl_geodashboard:
+    container_name: spl-geodashboard
+    image: rilusmahmud/spl-geodashboard:${TAG}
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_BASE_URL=https://spl.barikoimaps.dev
+      - NEXT_PUBLIC_BARIKOI_API_KEY=bkoi_38b527ad4d372c58270e7b04fca4e29c39befad01e52aaffef855dab0fbfe9de
+    ports:
+      - "8071:3000"

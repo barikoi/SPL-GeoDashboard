@@ -31,6 +31,11 @@ interface MapState {
   timeLimit: number; // Add timeLimit to the state
   showIsochrones: boolean; // Add this property
   suggestedHubs: SuggestedHub[] | null;
+  populationLayerVisible: boolean;
+  isNightMode: boolean;
+  isCalculatingCoverage: boolean;
+  deckglLayer: 'Hexgonlayer' | 'Heatmaplayer',
+  isShowBuilding: boolean;
 }
 
 const initialState: MapState = {
@@ -40,6 +45,11 @@ const initialState: MapState = {
   timeLimit: 10, // Default time limit in minutes
   showIsochrones: false, // Add initial value
   suggestedHubs: null,
+  populationLayerVisible: true,
+  isNightMode: false,
+  isCalculatingCoverage: false,
+  deckglLayer: 'Hexgonlayer',
+  isShowBuilding: false,
 };
 
 const mapSlice = createSlice({
@@ -76,8 +86,8 @@ const mapSlice = createSlice({
       state.timeLimit = action.payload; // Update timeLimit
       state.showIsochrones = false;
     },
-    showIsochrones: (state) => {
-      state.showIsochrones = true; // Add a new state property
+    showIsochrones: (state, action) => {
+      state.showIsochrones = action.payload; // Add a new state property
     },
     updateDatasetWithIsochrones: (
       state,
@@ -87,8 +97,12 @@ const mapSlice = createSlice({
         (d) => d.id === action.payload.datasetId
       );
       if (dataset) {
-        dataset.data = action.payload.updatedData;
-        dataset.hasIsochrones = true; // Add flag to indicate isochrones are available
+        // Directly update the data with isochrones
+        dataset.data = action.payload.updatedData.map((point) => ({
+          ...point,
+          coverage: point.isochrones ? JSON.parse(point.isochrones) : null,
+        }));
+        dataset.hasIsochrones = true;
       }
     },
     resetIsochrones: (state) => {
@@ -108,6 +122,21 @@ const mapSlice = createSlice({
     setSuggestedHubs: (state, action: PayloadAction<SuggestedHub[]>) => {
       state.suggestedHubs = action.payload;
     },
+    togglePopulationLayer: (state) => {
+      state.populationLayerVisible = !state.populationLayerVisible;
+    },
+    toggleNightMode: (state) => {
+      state.isNightMode = !state.isNightMode; // Toggle night mode
+    },
+    setCalculatingCoverage: (state, action: PayloadAction<boolean>) => {
+      state.isCalculatingCoverage = action.payload;
+    },
+    setDeckglLayer: (state, action) => {
+      state.deckglLayer = action.payload;
+    },
+    toggleBuildingShow: (state) => {
+      state.isShowBuilding = !state.isShowBuilding; 
+    },
   },
 });
 
@@ -123,5 +152,10 @@ export const {
   resetIsochrones,
   updateDatasetWithDownloadable,
   setSuggestedHubs,
+  togglePopulationLayer,
+  toggleNightMode,
+  setCalculatingCoverage,
+  setDeckglLayer,
+  toggleBuildingShow
 } = mapSlice.actions;
 export default mapSlice.reducer;
