@@ -198,7 +198,7 @@ function MapComponent() {
                 message.success({content: "Coverage calculated and file processed successfully", key: "covergae-calculte", duration: 15});
                 
                 // Fly to the area with highest data density
-                flyToHighestDensityArea(dataset);
+                // flyToHighestDensityArea(dataset);
               }
             }
           }
@@ -243,19 +243,19 @@ function MapComponent() {
   }, []);
 
   // Update the useEffect for datasets.length
-  useEffect(() => {
-    // When datasets change, check if a new one was added
-    if (datasets.length > 0 && !showIsochrones) {
-      const latestDataset = datasets[datasets.length - 1];
-      // Only fly if the dataset has data
-      if (latestDataset && latestDataset.data && latestDataset.data.length > 0) {
-        // Add a small delay to ensure the map is ready
-        setTimeout(() => {
-          flyToHighestDensityArea(latestDataset);
-        }, 1000);
-      }
-    }
-  }, [datasets.length]); // Only trigger when the number of datasets changes
+  // useEffect(() => {
+  //   // When datasets change, check if a new one was added
+  //   if (datasets.length > 0 && !showIsochrones) {
+  //     const latestDataset = datasets[datasets.length - 1];
+  //     // Only fly if the dataset has data
+  //     if (latestDataset && latestDataset.data && latestDataset.data.length > 0) {
+  //       // Add a small delay to ensure the map is ready
+  //       setTimeout(() => {
+  //         flyToHighestDensityArea(latestDataset);
+  //       }, 1000);
+  //     }
+  //   }
+  // }, [datasets.length]); // Only trigger when the number of datasets changes
 
   const layers = [
     ...datasets
@@ -522,6 +522,35 @@ function MapComponent() {
       }
     };
   }, [mapStyle, isShowBuilding]); // Re-run when mapStyle or isShowBuilding changes
+
+  // Add useEffect to fly to suggested hubs when they're loaded
+  useEffect(() => {
+    if (suggestedHubs && suggestedHubs.length > 0 && mapRef.current) {
+      // Calculate the center of all suggested hubs
+      const sumLon = suggestedHubs.reduce((sum, hub) => sum + hub.longitude, 0);
+      const sumLat = suggestedHubs.reduce((sum, hub) => sum + hub.latitude, 0);
+      const centerLon = sumLon / suggestedHubs.length;
+      const centerLat = sumLat / suggestedHubs.length;
+      
+      console.log(`Flying to suggested hubs center: ${centerLat}, ${centerLon}`);
+      
+      // Add a small delay to ensure the map is ready
+      setTimeout(() => {
+        if (mapRef.current) {
+          try {
+            mapRef.current.flyTo({
+              center: [centerLon, centerLat],
+              zoom: 11,
+              duration: 2000,
+              essential: true
+            });
+          } catch (error) {
+            console.error("Error during flyTo suggested hubs:", error);
+          }
+        }
+      }, 500);
+    }
+  }, [suggestedHubs]);
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">

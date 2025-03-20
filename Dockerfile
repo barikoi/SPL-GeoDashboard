@@ -1,27 +1,53 @@
-# Base image
-FROM node:18-alpine
+## ## ##
+# Install dependencies only when needed
+FROM node:20.5.0-alpine AS deps
 
-# Set working directory
+# # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
-# Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci
+ENV SKIP_HUSKY=1
 
-# Copy project files
+RUN npm ci --force
+
+# Rebuild the source code only when needed
+FROM node:20.5.0-alpine AS builder
+
+WORKDIR /app
+
 COPY . .
+COPY --from=deps /app/node_modules ./node_modules
 
-# Build the application
+ENV NEXT_PUBLIC_BASE_URL=NEXT_PUBLIC_BASE_URL
+ENV NEXT_PUBLIC_BARIKOI_API_KEY=NEXT_PUBLIC_BARIKOI_API_KEY
+
 RUN npm run build
 
-# Expose port
+# Production image, copy all the files and run next
+FROM node:20.5.0-alpine AS runner
+
+WORKDIR /app
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001 && \
+    chown -R nextjs:nodejs /app/.next
+
+USER nextjs
+
 EXPOSE 3000
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV NEXT_PUBLIC_BARIKOI_API_KEY=your_api_key_here
+RUN npx next telemetry disable
 
-# Start the application
-CMD ["npm", "start"] 
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+CMD ["npm", "run", "start"]
