@@ -37,6 +37,7 @@ interface MapState {
   deckglLayer: 'Hexgonlayer' | 'Heatmaplayer',
   isShowBuilding: boolean;
   isShowRegion: boolean;
+  isShowCoveragePercetage: boolean;
 }
 
 const initialState: MapState = {
@@ -51,6 +52,7 @@ const initialState: MapState = {
   isCalculatingCoverage: false,
   deckglLayer: 'Hexgonlayer',
   isShowBuilding: false,
+  isShowCoveragePercetage: false
 };
 
 const mapSlice = createSlice({
@@ -141,6 +143,9 @@ const mapSlice = createSlice({
     toggleRegionShow: (state) => {
       state.isShowRegion = !state.isShowRegion; 
     },
+    setIsShowCoveragePercetage:  (state, action) => {
+      state.isShowCoveragePercetage = action.payload; 
+    },
   },
 });
 
@@ -161,6 +166,7 @@ export const {
   setCalculatingCoverage,
   setDeckglLayer,
   toggleBuildingShow,
-  toggleRegionShow
+  toggleRegionShow,
+  setIsShowCoveragePercetage
 } = mapSlice.actions;
 export default mapSlice.reducer;

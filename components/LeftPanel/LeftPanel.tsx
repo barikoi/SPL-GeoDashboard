@@ -13,7 +13,8 @@ import {
   togglePopulationLayer,
   toggleNightMode,
   setDeckglLayer,
-  toggleBuildingShow
+  toggleBuildingShow,
+  setIsShowCoveragePercetage
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -567,7 +568,18 @@ const LeftPanel = () => {
 
           <div className="flex space-x-2">
             <button
-              onClick={() => dispatch(showIsochrones(true))}
+              onClick={() => {
+                dispatch(showIsochrones(true));
+                // setTimeout(() => {
+                //   dispatch(setIsShowCoveragePercetage(true));
+                // },5000);
+                
+                // Dispatch a custom event to trigger coverage calculation in MapComponent
+                const event = new CustomEvent("calculateCoverage", {
+                  detail: { triggered: true }
+                });
+                window.dispatchEvent(event);
+              }}
               disabled={isCalculatingCoverage}
               className={`flex-1 py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center ${
                 isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""

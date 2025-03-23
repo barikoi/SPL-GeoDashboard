@@ -64,6 +64,7 @@ function MapComponent() {
   const deckglLayer = useSelector((state: RootState) => state.map.deckglLayer);
   const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
   const isShowRegion = useSelector((state: RootState) => state.map.isShowRegion);
+  const isShowCoveragePercetage = useSelector((state: RootState) => state.map.isShowCoveragePercetage);
 
   // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -682,8 +683,8 @@ function MapComponent() {
     }
   }, [suggestedHubs]);
 
-  // Calculate total country coverage
-  const calculateCoverageStats = useCallback(() => {
+  // Calculate total country coverage 
+  const calculateCoverageStats = () => {
     if (!provincePolygons.length || !datasets.length) return;
 
     try {
@@ -755,23 +756,22 @@ function MapComponent() {
         coveragePercentage: coveragePercentage
       }];
 
-      console.log("Coverage stats calculated:", stats);
       setCoverageStats(stats);
       setShowCoverageStats(true);
     } catch (error) {
       console.error("Error calculating coverage stats:", error);
       message.error("Error calculating coverage statistics");
     }
-  }, [datasets]);
+  };
   
   // Create a coverage statistics panel
   const CoverageStatsPanel = useMemo(() => {
     if (!showCoverageStats || coverageStats.length === 0) return null;
     
     return (
-      <div className="absolute top-20 right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
+      <div className="absolute top-[260px] right-12 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-lg">Coverage Statistics</h3>
+          <h3 className="font-bold text-md">Coverage Statistics</h3>
           <button 
             onClick={() => setShowCoverageStats(false)}
             className="text-gray-500 hover:text-gray-700"
@@ -800,6 +800,21 @@ function MapComponent() {
       </div>
     );
   }, [showCoverageStats, coverageStats]);
+
+  // Add this inside your component, before the return statement
+  useEffect(() => {
+    // Add event listener for the calculateCoverage event
+    const handleCalculateCoverage = () => {
+      calculateCoverageStats();
+    };
+
+    window.addEventListener("calculateCoverage", handleCalculateCoverage);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener("calculateCoverage", handleCalculateCoverage);
+    };
+  }, []); // Make sure to include calculateCoverageStats in the dependency array
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
