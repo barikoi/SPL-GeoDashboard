@@ -684,7 +684,7 @@ function MapComponent() {
   }, [suggestedHubs]);
 
   // Calculate total country coverage 
-  const calculateCoverageStats = () => {
+  const calculateCoverageStats = useCallback(async () => {
     if (!provincePolygons.length || !datasets.length) return;
 
     try {
@@ -709,6 +709,66 @@ function MapComponent() {
       let totalCoverageArea = 0;
       const allCoverageFeatures: any[] = [];
 
+      // Create a map to track coverage by region
+      const regionCoverage: Record<string, { 
+        totalArea: number, 
+        coveredArea: number, 
+        coveragePercentage: number 
+      }> = {};
+
+      // Helper function to check if a name refers to Riyadh (case insensitive)
+      const isRiyadh = (name: string) => {
+        return name && name.toLowerCase().includes('riyad');
+      };
+
+      // First, calculate total area for each region from the GeoJSON data
+      try {
+        // Assuming you have the GeoJSON data loaded
+        const geoJSONData = await fetch('/gadm41_SAU_2.json').then(res => res.json());
+        
+        // Find the Riyadh region in the GeoJSON data
+        let riyadhRegionName = null;
+        
+        geoJSONData.features.forEach(feature => {
+          const regionName = feature.properties.NAME_1;
+          console.log({regionName})
+          
+          // Check if this is Riyadh (using any spelling variation)
+          if (isRiyadh(regionName)) {
+            riyadhRegionName = regionName;
+            if (!regionCoverage["Riyadh"]) {
+              regionCoverage["Riyadh"] = { 
+                totalArea: 0, 
+                coveredArea: 0, 
+                coveragePercentage: 0 
+              };
+            }
+            
+            const regionFeature = turf.feature(feature.geometry);
+            const regionArea = turf.area(regionFeature);
+            regionCoverage["Riyadh"].totalArea += regionArea;
+          } else {
+            // For other regions, just add to total country area
+            if (!regionCoverage[regionName]) {
+              regionCoverage[regionName] = { 
+                totalArea: 0, 
+                coveredArea: 0, 
+                coveragePercentage: 0 
+              };
+            }
+            
+            const regionFeature = turf.feature(feature.geometry);
+            const regionArea = turf.area(regionFeature);
+            regionCoverage[regionName].totalArea += regionArea;
+          }
+        });
+        
+        console.log(`Found Riyadh region as: ${riyadhRegionName}`);
+        
+      } catch (error) {
+        console.error("Error processing region data:", error);
+      }
+
       datasets.forEach(dataset => {
         if (dataset.visible) {
           dataset.data.forEach((point: DataPoint) => {
@@ -721,7 +781,30 @@ function MapComponent() {
                 if (coverage && coverage.coordinates) {
                   const coverageFeature = turf.polygon(coverage.coordinates);
                   allCoverageFeatures.push(coverageFeature);
-                  totalCoverageArea += turf.area(coverageFeature);
+                  
+                  // Calculate area
+                  const coverageArea = turf.area(coverageFeature);
+                  totalCoverageArea += coverageArea;
+                  
+                  // Check if this point is in Riyadh
+                  // We'll use the City field from the original data
+                  const originalPoint = dataset.originalFile.find(
+                    (op: any) => 
+                      op.latitude === point.latitude && 
+                      op.longitude === point.longitude
+                  );
+                  console.log(originalPoint)
+                  if (originalPoint && isRiyadh(originalPoint.properties.City)) {
+                    // Add to Riyadh region
+                    if (!regionCoverage["Riyadh"]) {
+                      regionCoverage["Riyadh"] = { 
+                        totalArea: 0, 
+                        coveredArea: 0, 
+                        coveragePercentage: 0 
+                      };
+                    }
+                    regionCoverage["Riyadh"].coveredArea += coverageArea;
+                  }
                 }
               } catch (error) {
                 console.error("Error parsing coverage:", error);
@@ -734,27 +817,65 @@ function MapComponent() {
                 const options = { steps: 64, units: 'kilometers' as turf.Units };
                 const circle = turf.circle(center, radius, options);
                 allCoverageFeatures.push(circle);
-                totalCoverageArea += turf.area(circle);
+                
+                const coverageArea = turf.area(circle);
+                totalCoverageArea += coverageArea;
+                
+                // Check if this point is in Riyadh
+                const originalPoint = dataset.originalFile.find(
+                  (op: any) => 
+                    op.latitude === point.latitude && 
+                    op.longitude === point.longitude
+                );
+                
+                if (originalPoint && isRiyadh(originalPoint.City)) {
+                  // Add to Riyadh region
+                  if (!regionCoverage["Riyadh"]) {
+                    regionCoverage["Riyadh"] = { 
+                      totalArea: 0, 
+                      coveredArea: 0, 
+                      coveragePercentage: 0 
+                    };
+                  }
+                  regionCoverage["Riyadh"].coveredArea += coverageArea;
+                }
               }
             }
           });
         }
       });
 
-      console.log(`Total coverage area: ${totalCoverageArea} square meters`);
+      console.log({regionCoverage})
+
+      // Calculate percentages for each region
+      Object.entries(regionCoverage).forEach(([regionName, region]) => {
+        if (region.totalArea > 0) {
+          region.coveragePercentage = (region.coveredArea / region.totalArea) * 100;
+        }
+      });
 
       // Step 3: Calculate the percentage of coverage
       const coveragePercentage = (totalCoverageArea / totalCountryArea) * 100;
 
-      console.log(`Coverage percentage: ${coveragePercentage.toFixed(2)}%`);
-
-      // Step 4: Update the stats with the total coverage
-      const stats = [{
-        provinceName: "Total Country",
-        totalArea: totalCountryArea,
-        coveredArea: totalCoverageArea,
-        coveragePercentage: coveragePercentage
-      }];
+      // Step 4: Update the stats with the total coverage and Riyadh only
+      const stats = [
+        // {
+        //   provinceName: "Total Country",
+        //   totalArea: totalCountryArea,
+        //   coveredArea: totalCoverageArea,
+        //   coveragePercentage: coveragePercentage
+        // }
+      ];
+      
+      // Add Riyadh if it exists
+      if (regionCoverage["Riyadh"]) {
+        stats.push({
+          provinceName: "Riyadh",
+          totalArea: regionCoverage["Riyadh"].totalArea,
+          coveredArea: regionCoverage["Riyadh"].coveredArea,
+          coveragePercentage: regionCoverage["Riyadh"].coveragePercentage
+        });
+      }
 
       setCoverageStats(stats);
       setShowCoverageStats(true);
@@ -762,16 +883,16 @@ function MapComponent() {
       console.error("Error calculating coverage stats:", error);
       message.error("Error calculating coverage statistics");
     }
-  };
+  }, [datasets, provincePolygons]);
   
   // Create a coverage statistics panel
   const CoverageStatsPanel = useMemo(() => {
     if (!showCoverageStats || coverageStats.length === 0) return null;
     
     return (
-      <div className="absolute top-[260px] right-12 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
+      <div className="absolute top-20 right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-md">Coverage Statistics</h3>
+          <h3 className="font-bold text-lg">Coverage Statistics</h3>
           <button 
             onClick={() => setShowCoverageStats(false)}
             className="text-gray-500 hover:text-gray-700"
@@ -782,14 +903,22 @@ function MapComponent() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-2">Province</th>
+              <th className="text-left py-2">Region</th>
+              <th className="text-right py-2">Area (km²)</th>
+              <th className="text-right py-2">Coverage (km²)</th>
               <th className="text-right py-2">Coverage %</th>
             </tr>
           </thead>
           <tbody>
             {coverageStats.map((stat, index) => (
-              <tr key={index} className="border-b">
+              <tr key={index} className={index === 0 ? "border-b font-bold bg-gray-100" : "border-b"}>
                 <td className="py-2">{stat.provinceName}</td>
+                <td className="text-right py-2">
+                  {(stat.totalArea / 1000000).toFixed(2)}
+                </td>
+                <td className="text-right py-2">
+                  {(stat.coveredArea / 1000000).toFixed(2)}
+                </td>
                 <td className="text-right py-2">
                   {stat.coveragePercentage.toFixed(2)}%
                 </td>
