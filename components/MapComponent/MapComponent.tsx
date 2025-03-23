@@ -1,6 +1,6 @@
 // components/MapComponent.tsx
 import * as React from "react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   AttributionControl,
   Map,
@@ -19,6 +19,7 @@ import {
   resetIsochrones,
   setCalculatingCoverage,
   toggleBuildingShow,
+  toggleRegionShow,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Progress, message } from "antd"; 
@@ -26,11 +27,13 @@ import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { transformIsochroneToGeometry } from "@/utils/localUtils";
+import { getRandomColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaCalculator } from "react-icons/fa";
+import { HeatMapOutlined } from "@ant-design/icons";
+import * as turf from '@turf/turf';
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -60,8 +63,9 @@ function MapComponent() {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const deckglLayer = useSelector((state: RootState) => state.map.deckglLayer);
   const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
+  const isShowRegion = useSelector((state: RootState) => state.map.isShowRegion);
 
-  // Remove the redux hover info and use local state
+  // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [isochrones, setIsochrones] = useState<IsochroneData[]>([]);
   const [progress, setProgress] = useState(0);
@@ -69,12 +73,21 @@ function MapComponent() {
   const [isochroneLayers, setIsochroneLayers] = useState<any[]>([]);
   const [populationPoints, setPopulationPoints] = useState<[number, number][]>([]);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [provincePolygons, setProvincePolygons] = useState<any[]>([]);
+  const [coverageStats, setCoverageStats] = useState<{
+    provinceName: string;
+    totalArea: number;
+    coveredArea: number;
+    coveragePercentage: number;
+  }[]>([]);
+  const [showCoverageStats, setShowCoverageStats] = useState(false);
 
-  // Toggle the modes
+  // Toggle night and white modes
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
     : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
   
+  // Toggle 2D and 3D mode
   const handleToggle3DMode = () => {
     setIs3DMode(!is3DMode);
     const map = mapRef.current;
@@ -82,6 +95,53 @@ function MapComponent() {
       map.setPitch(is3DMode ? 60 : 0);
     }
   }
+
+  // Function to merge city polygons into province polygons
+  const mergeProvincePolygons = (data: any) => {
+    const provinceMap = new window.Map<string, any>();
+
+    data.features.forEach((feature: any) => {
+      const provinceName = feature.properties.NAME_1;
+      if (!provinceMap.has(provinceName)) {
+        // Assign a random color to each region
+        const color = getRandomColor();
+        provinceMap.set(provinceName, {
+          type: "Feature",
+          properties: {
+            name: provinceName,
+            color: color 
+          },
+          geometry: {
+            type: "MultiPolygon",
+            coordinates: []
+          }
+        });
+      }
+      
+      const provinceFeature = provinceMap.get(provinceName);
+      provinceFeature.geometry.coordinates.push(
+        ...feature.geometry.coordinates
+      );
+    });
+
+    return Array.from(provinceMap.values());
+  };
+
+  // Load and process the province data
+  useEffect(() => {
+    const loadProvinceData = async () => {
+      try {
+        const response = await fetch('/gadm41_SAU_2.json');
+        const data = await response.json();
+        const mergedPolygons = mergeProvincePolygons(data);
+        setProvincePolygons(mergedPolygons);
+      } catch (error) {
+        console.error('Error loading province data:', error);
+      }
+    };
+
+    loadProvinceData();
+  }, []);
 
   // Update the tooltip handler
   const getTooltip = (info: PickingInfo) => {
@@ -127,8 +187,20 @@ function MapComponent() {
   }, [datasets, isochrones]);
 
   // Fix useEffect dependencies for fetchIsochrones
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasUploadedRef = useRef(false); // Track if upload has been performed
+
   useEffect(() => {
     if (showIsochrones) {
+      // Cancel any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create a new AbortController for this request
+      abortControllerRef.current = new AbortController();
+      hasUploadedRef.current = false; // Reset upload tracking
+
       const fetchIsochrones = async () => {
         dispatch(setCalculatingCoverage(true));
         try {
@@ -142,7 +214,8 @@ function MapComponent() {
                         point.latitude
                       },${point.longitude}&profile=foot&time_limit=${
                         timeLimit * 60
-                      }&reverse_flow=true`
+                      }&reverse_flow=true`,
+                      { signal: abortControllerRef.current?.signal }
                     );
                     if (!response.ok) {
                       throw new Error(`API Error: ${response.statusText}`);
@@ -156,7 +229,9 @@ function MapComponent() {
                       isochrones: geometry ? JSON.stringify(geometry) : null,
                     };
                   } catch (error) {
-                    console.error("Error fetching isochrone:", error);
+                    if (error.name !== 'AbortError') {
+                      console.error("Error fetching isochrone:", error);
+                    }
                     return point;
                   }
                 })
@@ -170,42 +245,53 @@ function MapComponent() {
                 })
               );
 
-              // Create CSV with coverage data
-              const csvData = updatedData.map((point) => ({
-                ...point.properties,
-                latitude: point.latitude,
-                longitude: point.longitude,
-                coverage: point.isochrones,
-              }));
+              // Only upload if it hasn't been done yet
+              if (!hasUploadedRef.current) {
+                // Create CSV with coverage data
+                const csvData = updatedData.map((point) => ({
+                  ...point.properties,
+                  latitude: point.latitude,
+                  longitude: point.longitude,
+                  coverage: point.isochrones,
+                }));
 
-              // Create form data for upload
-              const formData = new FormData();
-              const csvBlob = new Blob([Papa.unparse(csvData)], {
-                type: "text/csv",
-              });
-              formData.append("file", csvBlob, dataset.name);
+                // Create form data for upload
+                const formData = new FormData();
+                const csvBlob = new Blob([Papa.unparse(csvData)], {
+                  type: "text/csv",
+                });
+                formData.append("file", csvBlob, dataset.name);
 
-              // Upload processed file
-              const uploadResponse = await fetch(
-                "http://202.72.236.166:8000/upload_hub_locations/",
-                {
-                  method: "POST",
-                  body: formData,
+                // Upload processed file with AbortController
+                const uploadResponse = await fetch(
+                  "http://202.72.236.166:8000/upload_hub_locations/",
+                  {
+                    method: "POST",
+                    body: formData,
+                    // signal: abortControllerRef.current?.signal
+                  }
+                );
+
+                if (uploadResponse.ok) {
+                  hasUploadedRef.current = true; // Mark as uploaded
+                  message.success({
+                    content: "Coverage calculated and file processed successfully", 
+                    key: "covergae-calculte", 
+                    duration: 15
+                  });
                 }
-              );
-
-              if (uploadResponse.ok) {
-                message.success({content: "Coverage calculated and file processed successfully", key: "covergae-calculte", duration: 15});
-                
-                // Fly to the area with highest data density
-                // flyToHighestDensityArea(dataset);
               }
             }
           }
           setIsochronesCalculated(true);
+          
+          // Calculate coverage stats after isochrones are calculated
+          calculateCoverageStats();
         } catch (error) {
-          console.error("Error in fetchIsochrones:", error);
-          message.error("Failed to process coverage data");
+          if (error.name !== 'AbortError') {
+            console.error("Error in fetchIsochrones:", error);
+            message.error("Failed to process coverage data");
+          }
         } finally {
           setProgress(0);
           dispatch(resetIsochrones());
@@ -213,7 +299,16 @@ function MapComponent() {
         }
       };
 
-      fetchIsochrones();
+      // Add a debounce delay to prevent rapid successive calls
+      const debounceTimeout = setTimeout(fetchIsochrones, 500);
+
+      // Cleanup function
+      return () => {
+        clearTimeout(debounceTimeout);
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     }
   }, [showIsochrones, datasets, dispatch, timeLimit]);
 
@@ -308,6 +403,41 @@ function MapComponent() {
           }),
         ]
       : []),
+    ...(isShowRegion ? [
+      new GeoJsonLayer({
+        id: 'province-polygons',
+        data: {
+          type: 'FeatureCollection',
+          features: provincePolygons
+        },
+        // @ts-ignore
+        getFillColor: (d) => {
+          return [...d.properties.color, 100]; 
+        },
+        // @ts-ignore
+        getLineColor: (d) => {
+          return [...d.properties.color, 200]; 
+        },
+        getLineWidth: 8,
+        pickable: true,
+        stroked: true,
+        filled: true,
+        wireframe: true,
+        // @ts-ignore
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: info.object,
+              x: info.x,
+              y: info.y,
+              type: "province"
+            });
+          } else {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : []),
     populationLayerVisible &&
       // Only show population layer if no suggested hubs
       (deckglLayer === "Hexgonlayer" ? 
@@ -552,6 +682,125 @@ function MapComponent() {
     }
   }, [suggestedHubs]);
 
+  // Calculate total country coverage
+  const calculateCoverageStats = useCallback(() => {
+    if (!provincePolygons.length || !datasets.length) return;
+
+    try {
+      // Step 1: Calculate the total area of the country
+      let totalCountryArea = 0;
+      provincePolygons.forEach(province => {
+        try {
+          const provinceFeature = {
+            type: 'Feature',
+            properties: province.properties,
+            geometry: province.geometry
+          };
+          totalCountryArea += turf.area(provinceFeature);
+        } catch (error) {
+          console.error(`Error calculating area for province ${province.properties.name}:`, error);
+        }
+      });
+
+      console.log(`Total country area: ${totalCountryArea} square meters`);
+
+      // Step 2: Calculate the total coverage area of the datasets
+      let totalCoverageArea = 0;
+      const allCoverageFeatures: any[] = [];
+
+      datasets.forEach(dataset => {
+        if (dataset.visible) {
+          dataset.data.forEach((point: DataPoint) => {
+            if (point.coverage) {
+              try {
+                const coverage = typeof point.coverage === 'string' 
+                  ? JSON.parse(point.coverage) 
+                  : point.coverage;
+
+                if (coverage && coverage.coordinates) {
+                  const coverageFeature = turf.polygon(coverage.coordinates);
+                  allCoverageFeatures.push(coverageFeature);
+                  totalCoverageArea += turf.area(coverageFeature);
+                }
+              } catch (error) {
+                console.error("Error parsing coverage:", error);
+              }
+            } else {
+              // Create default coverage for points without coverage data
+              if (point.latitude && point.longitude) {
+                const center = [parseFloat(point.longitude), parseFloat(point.latitude)];
+                const radius = 5; // 5 kilometers
+                const options = { steps: 64, units: 'kilometers' as turf.Units };
+                const circle = turf.circle(center, radius, options);
+                allCoverageFeatures.push(circle);
+                totalCoverageArea += turf.area(circle);
+              }
+            }
+          });
+        }
+      });
+
+      console.log(`Total coverage area: ${totalCoverageArea} square meters`);
+
+      // Step 3: Calculate the percentage of coverage
+      const coveragePercentage = (totalCoverageArea / totalCountryArea) * 100;
+
+      console.log(`Coverage percentage: ${coveragePercentage.toFixed(2)}%`);
+
+      // Step 4: Update the stats with the total coverage
+      const stats = [{
+        provinceName: "Total Country",
+        totalArea: totalCountryArea,
+        coveredArea: totalCoverageArea,
+        coveragePercentage: coveragePercentage
+      }];
+
+      console.log("Coverage stats calculated:", stats);
+      setCoverageStats(stats);
+      setShowCoverageStats(true);
+    } catch (error) {
+      console.error("Error calculating coverage stats:", error);
+      message.error("Error calculating coverage statistics");
+    }
+  }, [datasets]);
+  
+  // Create a coverage statistics panel
+  const CoverageStatsPanel = useMemo(() => {
+    if (!showCoverageStats || coverageStats.length === 0) return null;
+    
+    return (
+      <div className="absolute top-20 right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-bold text-lg">Coverage Statistics</h3>
+          <button 
+            onClick={() => setShowCoverageStats(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ×
+          </button>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">Province</th>
+              <th className="text-right py-2">Coverage %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coverageStats.map((stat, index) => (
+              <tr key={index} className="border-b">
+                <td className="py-2">{stat.provinceName}</td>
+                <td className="text-right py-2">
+                  {stat.coveragePercentage.toFixed(2)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }, [showCoverageStats, coverageStats]);
+
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
       {/* <DeckGL 
@@ -577,7 +826,7 @@ function MapComponent() {
           <FullscreenControl />
           <NavigationControl position="top-right" />
           <div
-            style={typeof window !== 'undefined' && window.screen.width > 350 ? { ...Style } : { ...Style }}
+            style={typeof window !== 'undefined' && window.screen.width > 350 && { ...Style }}
           >
             <MapControlButton
               title={is3DMode ? "Switch to 3D" : "Switch to 2D"}
@@ -590,6 +839,18 @@ function MapComponent() {
               onClick={() => dispatch(toggleBuildingShow())}
               icon={isShowBuilding ? <FaEyeSlash  color="#333333" /> : <FaEye  color="#333333" />}
               isActive={isShowBuilding}
+            />
+            <MapControlButton
+              title={isShowRegion ? "Hide Regions" : "Show Regions"}
+              onClick={() => dispatch(toggleRegionShow())}
+              icon={ <HeatMapOutlined style={{ color: "#333333" }} /> }
+              isActive={isShowRegion}
+            />
+            <MapControlButton
+              title="Calculate Coverage"
+              onClick={calculateCoverageStats}
+              icon={<FaCalculator color="#333333" />}
+              isActive={showCoverageStats}
             />
           </div>
           <DeckGLOverlay layers={ layers } />
@@ -635,6 +896,8 @@ function MapComponent() {
           )}
         </div>
       )}
+      
+      {CoverageStatsPanel}
     </div>
   );
 }
