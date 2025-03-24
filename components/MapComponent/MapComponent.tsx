@@ -27,7 +27,7 @@ import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { getRandomColor, transformIsochroneToGeometry } from "@/utils/localUtils";
+import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
@@ -106,7 +106,7 @@ function MapComponent() {
       const provinceName = feature.properties.NAME_1;
       if (!provinceMap.has(provinceName)) {
         // Assign a random color to each region
-        const color = getRandomColor();
+        const color = getSequentialColor();
         provinceMap.set(provinceName, {
           type: "Feature",
           properties: {
