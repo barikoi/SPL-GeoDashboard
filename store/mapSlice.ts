@@ -145,7 +145,7 @@ const mapSlice = createSlice({
     },
     setIsShowCoveragePercetage:  (state, action) => {
       state.isShowCoveragePercetage = action.payload; 
-    },
+    }
   },
 });
 

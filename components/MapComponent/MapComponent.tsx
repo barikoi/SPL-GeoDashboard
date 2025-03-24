@@ -83,6 +83,14 @@ function MapComponent() {
     timeLimit: number;
   }[]>([]);
   const [showCoverageStats, setShowCoverageStats] = useState(false);
+  const [suggestedHubStats, setSuggestedHubStats] = useState<Array<{
+    provinceName: string;
+    totalArea: number;
+    coveredArea: number;
+    coveragePercentage: number;
+    hubCount: number;
+    timestamp: number;
+  }>>([]);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
@@ -678,6 +686,9 @@ function MapComponent() {
           }
         }
       }, 500);
+      
+      // Calculate suggested hub stats when hubs are loaded
+      calculateSuggestedHubStats();
     }
   }, [suggestedHubs]);
 
@@ -873,12 +884,110 @@ function MapComponent() {
     }
   }, [datasets, provincePolygons, timeLimit]);
   
-  // Create a coverage statistics panel
+  // Add this function to calculate suggested hub coverage stats
+  const calculateSuggestedHubStats = useCallback(async () => {
+    if (!suggestedHubs || suggestedHubs.length === 0) return;
+    
+    try {
+      let totalCoveredArea = 0;
+      
+      // Calculate the total coverage area from suggested hubs
+      suggestedHubs.forEach(hub => {
+        if (hub.coverage) {
+          try {
+            const coverage = typeof hub.coverage === 'string' 
+              ? JSON.parse(hub.coverage) 
+              : hub.coverage;
+              
+            if (coverage && coverage.coordinates) {
+              const coverageFeature = turf.polygon(coverage.coordinates);
+              const coverageArea = turf.area(coverageFeature);
+              totalCoveredArea += coverageArea;
+            }
+          } catch (error) {
+            console.error("Error parsing suggested hub coverage:", error);
+          }
+        }
+      });
+      
+      // Calculate Riyadh area using the same method as calculateCoverageStats
+      let riyadhArea = 0;
+      try {
+        // Assuming you have the GeoJSON data loaded
+        const geoJSONData = await fetch('/riyadh_city.json').then(res => res.json());
+        
+        // Find the Riyadh region in the GeoJSON data
+        geoJSONData.features.forEach(feature => {
+          const cityName = feature.properties.NAME_2;
+          
+          // Check if this is Riyadh (using any spelling variation)
+          if (cityName && cityName.toLowerCase().includes('riyad')) {
+            const regionFeature = turf.feature(feature.geometry);
+            const regionArea = turf.area(regionFeature);
+            riyadhArea += regionArea;
+          }
+        });
+      } catch (error) {
+        console.error("Error processing region data:", error);
+      }
+      
+      // Calculate coverage percentage
+      const coveragePercentage = riyadhArea > 0 ? (totalCoveredArea / riyadhArea) * 100 : 0;
+      
+      // Create a new stat entry with the current timestamp
+      const newStat = {
+        provinceName: "Riyadh",
+        totalArea: riyadhArea,
+        coveredArea: totalCoveredArea,
+        coveragePercentage: coveragePercentage,
+        hubCount: suggestedHubs.length,
+        timestamp: Date.now()
+      };
+      
+      // Update state with the calculated stats - remove any existing entry with the same hub count
+      setSuggestedHubStats(prevStats => {
+        // Filter out any existing stats with the same hub count
+        const filteredStats = prevStats.filter(stat => stat.hubCount !== suggestedHubs.length);
+        // Add the new stat
+        return [...filteredStats, newStat];
+      });
+      
+    } catch (error) {
+      console.error("Error calculating suggested hub stats:", error);
+      message.error("Failed to calculate suggested hub coverage statistics");
+    }
+  }, [suggestedHubs]);
+
+  // Combine both calculations in one function
+  const handleCalculateCoverage = useCallback(() => {
+    setShowCoverageStats(prev => !prev);
+    
+    // If we're showing the stats, calculate both regular and suggested hub stats
+    if (!showCoverageStats) {
+      // First calculate the regular coverage stats
+      calculateCoverageStats();
+      
+      // Then calculate suggested hub stats if available
+      if (suggestedHubs && suggestedHubs.length > 0) {
+        // Add a small delay to ensure coverage stats are calculated first
+        setTimeout(() => {
+          calculateSuggestedHubStats();
+        }, 100);
+      }
+    }
+  }, [showCoverageStats, calculateCoverageStats, suggestedHubs, calculateSuggestedHubStats]);
+
+  // Update the CoverageStatsPanel to include suggested hub stats
   const CoverageStatsPanel = useMemo(() => {
-    if (!showCoverageStats || coverageStats.length === 0) return null;
+    if (!showCoverageStats) return null;
     
     // Sort the stats by time limit
-    const sortedStats = [...coverageStats].sort((a, b) => a.timeLimit - b.timeLimit);
+    // const sortedStats = [...coverageStats].sort((a, b) => a.timeLimit - b.timeLimit);
+    const sortedStats = coverageStats;
+    
+    // Sort suggested hub stats by timestamp
+    // const sortedSuggestedStats = [...suggestedHubStats].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedSuggestedStats = suggestedHubStats;
     
     return (
       <div className="absolute top-[260px] right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
@@ -891,37 +1000,103 @@ function MapComponent() {
             ×
           </button>
         </div>
-        <table className="w-full text-sm border">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left py-2 px-3 border-r">Region</th>
-              <th className="text-right py-2 px-3 border-r">Time (min)</th>
-              <th className="text-right py-2 px-3 border-r">Area (km²)</th>
-              <th className="text-right py-2 px-3 border-r">Coverage (km²)</th>
-              <th className="text-right py-2 px-3">Coverage %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {coverageStats.map((stat, index) => (
-              <tr key={index} className={index === coverageStats.length - 1 ? "border-b font-bold bg-gray-100" : "border-b"}>
-                <td className="py-2 px-3 border-r">{stat.provinceName}</td>
-                <td className="text-right py-2 px-3 border-r">{stat.timeLimit}</td>
-                <td className="text-right py-2 px-3 border-r">
-                  {(stat.totalArea / 1000000).toFixed(2)}
-                </td>
-                <td className="text-right py-2 px-3 border-r">
-                  {(stat.coveredArea / 1000000).toFixed(2)}
-                </td>
-                <td className="text-right py-2 px-3">
-                  {stat.coveragePercentage.toFixed(2)}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        
+        {/* Current Hub Coverage Stats */}
+        {sortedStats.length > 0 && (
+          <>
+            <h4 className="font-semibold text-md mb-2">Current Hub Coverage</h4>
+            <table className="w-full text-sm border mb-4">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3 border-r">Region</th>
+                  <th className="text-right py-2 px-3 border-r">Time (min)</th>
+                  <th className="text-right py-2 px-3 border-r">Area (km²)</th>
+                  <th className="text-right py-2 px-3 border-r">Coverage (km²)</th>
+                  <th className="text-right py-2 px-3">Coverage %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedStats.map((stat, index) => (
+                  <tr key={index} className={index === sortedStats.length - 1 ? "border-b font-bold bg-gray-100" : "border-b"}>
+                    <td className="py-2 px-3 border-r">{stat.provinceName}</td>
+                    <td className="text-right py-2 px-3 border-r">{stat.timeLimit}</td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.totalArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.coveredArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3">
+                      {stat.coveragePercentage.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+        
+        {/* Suggested Hub Coverage Stats */}
+        {sortedSuggestedStats.length > 0 && suggestedHubs && suggestedHubs.length > 0 && (
+          <>
+            <h4 className="font-semibold text-md mb-2">Suggested Hub Coverage</h4>
+            <table className="w-full text-sm border">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3 border-r">Region</th>
+                  <th className="text-right py-2 px-3 border-r">Hubs</th>
+                  <th className="text-right py-2 px-3 border-r">Area (km²)</th>
+                  <th className="text-right py-2 px-3 border-r">Coverage (km²)</th>
+                  <th className="text-right py-2 px-3">Coverage %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSuggestedStats.map((stat, index) => (
+                  <tr 
+                    key={index} 
+                    className={index === sortedSuggestedStats.length - 1 ? "border-b font-bold bg-green-50" : "border-b"}
+                  >
+                    <td className="py-2 px-3 border-r">{stat.provinceName}</td>
+                    <td className="text-right py-2 px-3 border-r">{stat.hubCount}</td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.totalArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.coveredArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3">
+                      {stat.coveragePercentage.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {/* Comparison section */}
+            {sortedStats.length > 0 && sortedSuggestedStats.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-md mb-2">Coverage Comparison</h4>
+                <p className="text-sm">
+                  <span className="font-medium">Improvement: </span>
+                  {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage - 
+                    sortedStats[sortedStats.length - 1].coveragePercentage).toFixed(2)}% 
+                  {sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage > 
+                    sortedStats[sortedStats.length - 1].coveragePercentage 
+                    ? " increase" 
+                    : " decrease"} in coverage
+                </p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Hub Efficiency: </span>
+                  {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveredArea / 
+                    sortedSuggestedStats[sortedSuggestedStats.length - 1].hubCount / 1000000).toFixed(2)} km² per hub
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
-  }, [showCoverageStats, coverageStats]);
+  }, [showCoverageStats, coverageStats, suggestedHubStats, suggestedHubs]);
 
   // Add this inside your component, before the return statement
   useEffect(() => {
@@ -985,7 +1160,7 @@ function MapComponent() {
             />
             <MapControlButton
               title="Calculate Coverage"
-              onClick={calculateCoverageStats}
+              onClick={handleCalculateCoverage}
               icon={<FaCalculator color="#333333" />}
               isActive={showCoverageStats}
             />
