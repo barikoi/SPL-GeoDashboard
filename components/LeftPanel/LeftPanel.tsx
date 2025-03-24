@@ -570,9 +570,6 @@ const LeftPanel = () => {
             <button
               onClick={() => {
                 dispatch(showIsochrones(true));
-                // setTimeout(() => {
-                //   dispatch(setIsShowCoveragePercetage(true));
-                // },5000);
                 
                 // Dispatch a custom event to trigger coverage calculation in MapComponent
                 const event = new CustomEvent("calculateCoverage", {

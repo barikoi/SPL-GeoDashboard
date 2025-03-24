@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "name": "gadm41_SAU_2",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "GID_2": "SAU.7.20_1",
+        "GID_0": "SAU",
+        "COUNTRY": "SaudiArabia",
+        "GID_1": "SAU.7_1",
+        "NAME_1": "ArRiyad",
+        "NL_NAME_1": "الرياض‎",
+        "NAME_2": "Riyadh",
+        "VARNAME_2": "NA",
+        "NL_NAME_2": "NA",
+        "TYPE_2": "Muhafazah",
+        "ENGTYPE_2": "Governorate",
+        "CC_2": "NA",
+        "HASC_2": "NA"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                46.53512061718999,
+                24.837897551255807
+              ],
+              [
+                46.53512061718999,
+                24.474251948021916
+              ],
+              [
+                46.95932663215345,
+                24.474251948021916
+              ],
+              [
+                46.95932663215345,
+                24.837897551255807
+              ],
+              [
+                46.53512061718999,
+                24.837897551255807
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

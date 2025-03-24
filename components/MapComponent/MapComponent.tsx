@@ -102,7 +102,7 @@ function MapComponent() {
     const provinceMap = new window.Map<string, any>();
 
     data.features.forEach((feature: any) => {
-      const provinceName = feature.properties.NAME_1;
+      const provinceName = feature.properties.NAME_2;
       if (!provinceMap.has(provinceName)) {
         // Assign a random color to each region
         const color = getRandomColor();
@@ -322,7 +322,6 @@ function MapComponent() {
           parseFloat(String(row.Longitude)),
           parseFloat(String(row.Latitude)),
         ]);
-        console.log({points})
       setPopulationPoints(points);
     };
 
@@ -431,6 +430,7 @@ function MapComponent() {
               object: info.object,
               x: info.x,
               y: info.y,
+              // @ts-ignore
               type: "province"
             });
           } else {
@@ -473,7 +473,6 @@ function MapComponent() {
         highlightColor: [255, 255, 255, 100],
         // @ts-ignore
         onHover: (info: any) => {
-          console.log({ info: info})
           if (info.object) {
             setHoverInfo({
               object: info.object,
@@ -577,8 +576,6 @@ function MapComponent() {
       // Calculate the center of the densest cell
       const centerLon = densestCell.sumLon / densestCell.count;
       const centerLat = densestCell.sumLat / densestCell.count;
-      
-      console.log(`Flying to highest density area: ${centerLat}, ${centerLon} with ${maxCount} points`);
       
       // Add a small delay to ensure the map is fully loaded
       setTimeout(() => {
@@ -692,7 +689,7 @@ function MapComponent() {
       let totalCountryArea = 0;
       provincePolygons.forEach(province => {
         try {
-          const provinceFeature = {
+          const provinceFeature:any = {
             type: 'Feature',
             properties: province.properties,
             geometry: province.geometry
@@ -702,8 +699,6 @@ function MapComponent() {
           console.error(`Error calculating area for province ${province.properties.name}:`, error);
         }
       });
-
-      console.log(`Total country area: ${totalCountryArea} square meters`);
 
       // Step 2: Calculate the total coverage area of the datasets
       let totalCoverageArea = 0;
@@ -724,18 +719,17 @@ function MapComponent() {
       // First, calculate total area for each region from the GeoJSON data
       try {
         // Assuming you have the GeoJSON data loaded
-        const geoJSONData = await fetch('/gadm41_SAU_2.json').then(res => res.json());
+        const geoJSONData = await fetch('/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
         let riyadhRegionName = null;
         
         geoJSONData.features.forEach(feature => {
-          const regionName = feature.properties.NAME_1;
-          console.log({regionName})
+          const cityName = feature.properties.NAME_2;
           
           // Check if this is Riyadh (using any spelling variation)
-          if (isRiyadh(regionName)) {
-            riyadhRegionName = regionName;
+          if (isRiyadh(cityName)) {
+            riyadhRegionName = cityName;
             if (!regionCoverage["Riyadh"]) {
               regionCoverage["Riyadh"] = { 
                 totalArea: 0, 
@@ -749,8 +743,8 @@ function MapComponent() {
             regionCoverage["Riyadh"].totalArea += regionArea;
           } else {
             // For other regions, just add to total country area
-            if (!regionCoverage[regionName]) {
-              regionCoverage[regionName] = { 
+            if (!regionCoverage[cityName]) {
+              regionCoverage[cityName] = { 
                 totalArea: 0, 
                 coveredArea: 0, 
                 coveragePercentage: 0 
@@ -759,11 +753,9 @@ function MapComponent() {
             
             const regionFeature = turf.feature(feature.geometry);
             const regionArea = turf.area(regionFeature);
-            regionCoverage[regionName].totalArea += regionArea;
+            regionCoverage[cityName].totalArea += regionArea;
           }
         });
-        
-        console.log(`Found Riyadh region as: ${riyadhRegionName}`);
         
       } catch (error) {
         console.error("Error processing region data:", error);
@@ -771,7 +763,7 @@ function MapComponent() {
 
       datasets.forEach(dataset => {
         if (dataset.visible) {
-          dataset.data.forEach((point: DataPoint) => {
+          dataset.data.forEach((point: any) => {
             if (point.coverage) {
               try {
                 const coverage = typeof point.coverage === 'string' 
@@ -793,7 +785,7 @@ function MapComponent() {
                       op.latitude === point.latitude && 
                       op.longitude === point.longitude
                   );
-                  console.log(originalPoint)
+
                   if (originalPoint && isRiyadh(originalPoint.properties.City)) {
                     // Add to Riyadh region
                     if (!regionCoverage["Riyadh"]) {
@@ -844,8 +836,6 @@ function MapComponent() {
           });
         }
       });
-
-      console.log({regionCoverage})
 
       // Calculate percentages for each region
       Object.entries(regionCoverage).forEach(([regionName, region]) => {
