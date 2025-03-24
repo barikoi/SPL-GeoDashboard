@@ -80,6 +80,7 @@ function MapComponent() {
     totalArea: number;
     coveredArea: number;
     coveragePercentage: number;
+    timeLimit: number;
   }[]>([]);
   const [showCoverageStats, setShowCoverageStats] = useState(false);
 
@@ -102,7 +103,7 @@ function MapComponent() {
     const provinceMap = new window.Map<string, any>();
 
     data.features.forEach((feature: any) => {
-      const provinceName = feature.properties.NAME_2;
+      const provinceName = feature.properties.NAME_1;
       if (!provinceMap.has(provinceName)) {
         // Assign a random color to each region
         const color = getRandomColor();
@@ -848,39 +849,39 @@ function MapComponent() {
       const coveragePercentage = (totalCoverageArea / totalCountryArea) * 100;
 
       // Step 4: Update the stats with the total coverage and Riyadh only
-      const stats = [
-        // {
-        //   provinceName: "Total Country",
-        //   totalArea: totalCountryArea,
-        //   coveredArea: totalCoverageArea,
-        //   coveragePercentage: coveragePercentage
-        // }
-      ];
-      
-      // Add Riyadh if it exists
-      if (regionCoverage["Riyadh"]) {
-        stats.push({
-          provinceName: "Riyadh",
-          totalArea: regionCoverage["Riyadh"].totalArea,
-          coveredArea: regionCoverage["Riyadh"].coveredArea,
-          coveragePercentage: regionCoverage["Riyadh"].coveragePercentage
-        });
-      }
+      // Create a new stat entry with the current time limit
+      const newStat = {
+        provinceName: "Riyadh",
+        totalArea: regionCoverage["Riyadh"]?.totalArea || 0,
+        coveredArea: regionCoverage["Riyadh"]?.coveredArea || 0,
+        coveragePercentage: regionCoverage["Riyadh"]?.coveragePercentage || 0,
+        timeLimit: timeLimit
+      };
 
-      setCoverageStats(stats);
+      // Update the stats array - remove any existing entry with the same time limit
+      setCoverageStats(prevStats => {
+        // Filter out any existing stats with the same time limit
+        const filteredStats = prevStats.filter(stat => stat.timeLimit !== timeLimit);
+        // Add the new stat
+        return [...filteredStats, newStat];
+      });
+      
       setShowCoverageStats(true);
     } catch (error) {
       console.error("Error calculating coverage stats:", error);
       message.error("Error calculating coverage statistics");
     }
-  }, [datasets, provincePolygons]);
+  }, [datasets, provincePolygons, timeLimit]);
   
   // Create a coverage statistics panel
   const CoverageStatsPanel = useMemo(() => {
     if (!showCoverageStats || coverageStats.length === 0) return null;
     
+    // Sort the stats by time limit
+    const sortedStats = [...coverageStats].sort((a, b) => a.timeLimit - b.timeLimit);
+    
     return (
-      <div className="absolute top-20 right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
+      <div className="absolute top-[260px] right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
         <div className="flex justify-between items-center mb-2">
           <h3 className="font-bold text-lg">Coverage Statistics</h3>
           <button 
@@ -890,26 +891,28 @@ function MapComponent() {
             ×
           </button>
         </div>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm border">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-2">Region</th>
-              <th className="text-right py-2">Area (km²)</th>
-              <th className="text-right py-2">Coverage (km²)</th>
-              <th className="text-right py-2">Coverage %</th>
+              <th className="text-left py-2 px-3 border-r">Region</th>
+              <th className="text-right py-2 px-3 border-r">Time (min)</th>
+              <th className="text-right py-2 px-3 border-r">Area (km²)</th>
+              <th className="text-right py-2 px-3 border-r">Coverage (km²)</th>
+              <th className="text-right py-2 px-3">Coverage %</th>
             </tr>
           </thead>
           <tbody>
             {coverageStats.map((stat, index) => (
-              <tr key={index} className={index === 0 ? "border-b font-bold bg-gray-100" : "border-b"}>
-                <td className="py-2">{stat.provinceName}</td>
-                <td className="text-right py-2">
+              <tr key={index} className={index === coverageStats.length - 1 ? "border-b font-bold bg-gray-100" : "border-b"}>
+                <td className="py-2 px-3 border-r">{stat.provinceName}</td>
+                <td className="text-right py-2 px-3 border-r">{stat.timeLimit}</td>
+                <td className="text-right py-2 px-3 border-r">
                   {(stat.totalArea / 1000000).toFixed(2)}
                 </td>
-                <td className="text-right py-2">
+                <td className="text-right py-2 px-3 border-r">
                   {(stat.coveredArea / 1000000).toFixed(2)}
                 </td>
-                <td className="text-right py-2">
+                <td className="text-right py-2 px-3">
                   {stat.coveragePercentage.toFixed(2)}%
                 </td>
               </tr>
