@@ -20,6 +20,7 @@ import {
   setCalculatingCoverage,
   toggleBuildingShow,
   toggleRegionShow,
+  setSuggestedHubs,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Progress, message } from "antd"; 
@@ -91,6 +92,8 @@ function MapComponent() {
     hubCount: number;
     timestamp: number;
   }>>([]);
+  const [isFetchingIsochrones, setIsFetchingIsochrones] = useState(false);
+  const suggestedHubsRef = useRef<IsochroneData[]>([]);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
@@ -660,37 +663,125 @@ function MapComponent() {
     };
   }, [mapStyle, isShowBuilding]); // Re-run when mapStyle or isShowBuilding changes
 
-  // Add useEffect to fly to suggested hubs when they're loaded
+  // Update the useEffect for suggestedHubs to fetch isochrones
   useEffect(() => {
-    if (suggestedHubs && suggestedHubs.length > 0 && mapRef.current) {
-      // Calculate the center of all suggested hubs
-      const sumLon = suggestedHubs.reduce((sum, hub) => sum + hub.longitude, 0);
-      const sumLat = suggestedHubs.reduce((sum, hub) => sum + hub.latitude, 0);
-      const centerLon = sumLon / suggestedHubs.length;
-      const centerLat = sumLat / suggestedHubs.length;
-      
-      console.log(`Flying to suggested hubs center: ${centerLat}, ${centerLon}`);
-      
-      // Add a small delay to ensure the map is ready
-      setTimeout(() => {
-        if (mapRef.current) {
-          try {
-            mapRef.current.flyTo({
-              center: [centerLon, centerLat],
-              zoom: 11,
-              duration: 2000,
-              essential: true
-            });
-          } catch (error) {
-            console.error("Error during flyTo suggested hubs:", error);
-          }
-        }
-      }, 500);
-      
-      // Calculate suggested hub stats when hubs are loaded
-      calculateSuggestedHubStats();
+    // Skip if there are no hubs or already fetching
+    if (!suggestedHubs || suggestedHubs.length === 0 || isFetchingIsochrones) {
+      return;
     }
-  }, [suggestedHubs]);
+    
+    console.log("Suggested hubs received:", { 
+      hubCount: suggestedHubs.length
+    });
+    
+    // Calculate the center of all suggested hubs
+    const sumLon = suggestedHubs.reduce((sum, hub) => sum + hub.longitude, 0);
+    const sumLat = suggestedHubs.reduce((sum, hub) => sum + hub.latitude, 0);
+    const centerLon = sumLon / suggestedHubs.length;
+    const centerLat = sumLat / suggestedHubs.length;
+    
+    console.log(`Flying to suggested hubs center: ${centerLat}, ${centerLon}`);
+    
+    // Add a small delay to ensure the map is ready
+    setTimeout(() => {
+      if (mapRef.current) {
+        try {
+          mapRef.current.flyTo({
+            center: [centerLon, centerLat],
+            zoom: 11,
+            duration: 2000,
+            essential: true
+          });
+        } catch (error) {
+          console.error("Error during flyTo suggested hubs:", error);
+        }
+      }
+    }, 500);
+    
+    // Fetch fresh isochrones for each suggested hub
+    const fetchFreshIsochrones = async () => {
+      setIsFetchingIsochrones(true);
+      dispatch(setCalculatingCoverage(true));
+      message.loading({ content: "Calculating coverage for suggested hubs...", key: "suggestedHubsLoading" });
+      
+      try {
+        // Create a copy of the hubs without coverage data
+        const hubsWithoutCoverage = suggestedHubs.map(hub => ({
+          ...hub,
+          coverage: null // Remove any existing coverage data
+        }));
+        
+        // Update the store immediately to show just the points
+        dispatch(setSuggestedHubs(hubsWithoutCoverage));
+        
+        // Fetch fresh isochrones for each hub
+        const updatedHubs = await Promise.all(
+          suggestedHubs.map(async (hub, index) => {
+            console.log(`Fetching fresh isochrone for hub ${index} at ${hub.latitude},${hub.longitude}`);
+            try {
+              const response = await fetch(
+                `https://gh.bmapsbd.com/sau/isochrone?point=${
+                  hub.latitude
+                },${hub.longitude}&profile=foot&time_limit=${
+                  timeLimit * 60
+                }&reverse_flow=true`
+              );
+              
+              if (!response.ok) {
+                throw new Error(`API Error: ${response.statusText}`);
+              }
+
+              const isochroneData = await response.json();
+              const geometry = transformIsochroneToGeometry(isochroneData);
+              
+              console.log(`Successfully fetched isochrone for hub ${index}`);
+              return {
+                ...hub,
+                coverage: geometry ? JSON.stringify(geometry) : null,
+              };
+            } catch (error) {
+              console.error(`Error fetching isochrone for suggested hub ${index}:`, error);
+              return hub;
+            }
+          })
+        );
+        
+        console.log("All fresh isochrones fetched, updating state");
+        // Update the suggestedHubs with fresh isochrone data
+        dispatch(setSuggestedHubs(updatedHubs));
+        message.success({ 
+          content: "Coverage calculated for suggested hubs", 
+          key: "suggestedHubsLoading", 
+          duration: 3 
+        });
+        
+        // Calculate suggested hub stats
+        if (typeof calculateSuggestedHubStats === 'function') {
+          calculateSuggestedHubStats();
+        }
+      } catch (error) {
+        console.error("Error fetching fresh isochrones:", error);
+        message.error("Failed to calculate coverage for suggested hubs");
+      } finally {
+        dispatch(setCalculatingCoverage(false));
+        setIsFetchingIsochrones(false);
+      }
+    };
+    
+    // Use a ref to ensure we only fetch once per set of hubs
+    if (!suggestedHubsRef.current || 
+        suggestedHubsRef.current.length !== suggestedHubs.length ||
+        JSON.stringify(suggestedHubsRef.current) !== JSON.stringify(suggestedHubs)) {
+      
+      // Update the ref
+      suggestedHubsRef.current = [...suggestedHubs];
+      
+      // Fetch fresh isochrones
+      console.log("Fetching fresh isochrones for suggested hubs");
+      fetchFreshIsochrones();
+    }
+    
+  }, [suggestedHubs, timeLimit, dispatch, isFetchingIsochrones]);
 
   // Calculate total country coverage 
   const calculateCoverageStats = useCallback(async () => {
