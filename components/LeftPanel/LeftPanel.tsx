@@ -101,14 +101,24 @@ const LeftPanel = () => {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !files[0]) {
-      setFileUploaded(false);
+      // Only reset the file input, don't change the fileUploaded state
+      e.target.value = '';
       return;
     }
 
-    setFileUploaded(true);
     const file = files[0];
+    
+    // Check if the file has already been uploaded
+    const isFileAlreadyUploaded = datasets.some(dataset => dataset.name === file.name);
+    if (isFileAlreadyUploaded) {
+      message.error("This file has already been uploaded. Please upload a different file.");
+      // Reset the file input
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
+
     reader.onload = async (e: ProgressEvent<FileReader>) => {
       if (e.target?.result) {
         const content = e.target.result as string;
@@ -116,46 +126,105 @@ const LeftPanel = () => {
         const color = getRandomColor();
         const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [ number, number, number ];
 
-        if (file.name.endsWith(".csv")) {
-          Papa.parse(content, {
-            header: true,
-            dynamicTyping: true,
-            complete: (result) => {
-              // result output : data, errors and meta
-              const hasCoverage = checkForCoverageColumn(result.data);
-              setHasCoverageColumn(hasCoverage);
-              const normalizedData = normalizeData(result.data, "csv");
-              dispatch(
-                addDataset({
-                  id,
-                  name: file.name,
-                  data: normalizedData,
-                  visible: true,
-                  color,
-                  strokedColor,
-                  originalFile: result.data,
-                })
+        try {
+          if (file.name.endsWith(".csv")) {
+            Papa.parse(content, {
+              header: true,
+              dynamicTyping: true,
+              complete: (result) => {
+                // Validate required columns
+                const headers = result.meta.fields || [];
+                const requiredColumns = ['City', 'Latitude', 'Longitude'];
+                const missingColumns = requiredColumns.filter(col => 
+                  !headers.some(header => header.toLowerCase() === col.toLowerCase())
+                );
+
+                if (missingColumns.length > 0) {
+                  message.error(
+                    `Missing required columns: ${missingColumns.join(', ')}. ` +
+                    'Please ensure your file contains City, Latitude, and Longitude columns.'
+                  );
+                  // Reset the file input
+                  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                  if (fileInput) fileInput.value = '';
+                  return;
+                }
+
+                // Check for coverage column
+                const hasCoverage = checkForCoverageColumn(result.data);
+                setHasCoverageColumn(hasCoverage);
+                
+                // Normalize and add dataset
+                const normalizedData = normalizeData(result.data, "csv");
+                dispatch(
+                  addDataset({
+                    id,
+                    name: file.name,
+                    data: normalizedData,
+                    visible: true,
+                    color,
+                    strokedColor,
+                    originalFile: result.data,
+                  })
+                );
+                setFileUploaded(true);
+              },
+              error: (error) => {
+                console.error("Error parsing CSV file:", error);
+                message.error("Failed to parse CSV file");
+                // Reset the file input
+                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+              }
+            });
+          } else if (file.name.endsWith(".json")) {
+            const jsonData = JSON.parse(content);
+            
+            // Validate required fields in JSON
+            const firstItem = jsonData[0];
+            if (!firstItem || !firstItem.City || !firstItem.Latitude || !firstItem.Longitude) {
+              message.error(
+                'JSON file must contain City, Latitude, and Longitude fields'
               );
-            },
-          });
-        } else if (file.name.endsWith(".json")) {
-          const jsonData = JSON.parse(content);
-          setHasCoverageColumn(false);
-          const normalizedData = normalizeData(jsonData, "json");
-          dispatch(
-            addDataset({
-              id,
-              name: file.name,
-              data: normalizedData,
-              visible: true,
-              color,
-              strokedColor,
-              originalFile: jsonData,
-            })
-          );
+              // Reset the file input
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = '';
+              return;
+            }
+
+            setHasCoverageColumn(false);
+            const normalizedData = normalizeData(jsonData, "json");
+            dispatch(
+              addDataset({
+                id,
+                name: file.name,
+                data: normalizedData,
+                visible: true,
+                color,
+                strokedColor,
+                originalFile: jsonData,
+              })
+            );
+            setFileUploaded(true);
+          }
+        } catch (error) {
+          console.error("Error parsing file:", error);
+          message.error("Failed to parse file");
+          // Reset the file input
+          const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
         }
       }
     };
+
+    reader.onerror = () => {
+      console.error("Error reading file");
+      message.error("Failed to read file");
+      // Reset the file input
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    };
+
     reader.readAsText(file);
   };
 
@@ -184,11 +253,25 @@ const LeftPanel = () => {
         Papa.parse(e.target.result as string, {
           header: true,
           complete: (results) => {
+            // Validate required columns
+            const headers = results.meta.fields || [];
+            const requiredColumns = ['Latitude', 'Longitude'];
+            const missingColumns = requiredColumns.filter(col => 
+              !headers.some(header => header.toLowerCase() === col.toLowerCase())
+            );
+
+            if (missingColumns.length > 0) {
+              message.error(
+                `Missing required columns: ${missingColumns.join(', ')}. ` +
+                'Please ensure your population file contains Latitude and Longitude columns.'
+              );
+              return;
+            }
+
             // Validate data structure
             const sampleRow = results.data[0];
-
             if (!sampleRow?.Latitude || !sampleRow?.Longitude) {
-              message.error("File must contain Latitude and Longitude columns");
+              message.error("File must contain valid Latitude and Longitude columns");
               return;
             }
 

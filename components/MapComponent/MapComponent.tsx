@@ -1085,11 +1085,11 @@ function MapComponent() {
                     ? " increase" 
                     : " decrease"} in coverage
                 </p>
-                <p className="text-sm mt-1">
+                {/* <p className="text-sm mt-1">
                   <span className="font-medium">Hub Efficiency: </span>
                   {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveredArea / 
                     sortedSuggestedStats[sortedSuggestedStats.length - 1].hubCount / 1000000).toFixed(2)} km² per hub
-                </p>
+                </p> */}
               </div>
             )}
           </>
