@@ -678,7 +678,7 @@ function MapComponent() {
     }
   };
 
-  // Building showcasing by mainpuating map layers
+  // Update the useEffect for map loading
   useEffect(() => {
     // Function to toggle building layers visibility
     const toggleBuildingLayers = () => {
@@ -701,6 +701,9 @@ function MapComponent() {
           console.error(`Error toggling layer ${layerId}:`, error);
         }
       });
+      
+      // Add contour lines when map loads
+      addAridGridLayer();
     };
 
     // Try immediately
@@ -1406,6 +1409,55 @@ function MapComponent() {
 
     loadRiyadhCityData();
   }, [])
+
+  // Create a function to add the grid layer
+  const addAridGridLayer = () => {
+    try {
+      if (!mapRef.current) return;
+      
+      const map = mapRef.current.getMap();
+      
+      if (!map.getSource('contours')) {
+        map.addSource('contours', {
+          type: 'vector',
+          url: 'https://tiles.bmapsbd.com/arid_grid',
+          bounds: [46.551409, 24.826581, 46.653344, 24.969812]
+        });
+      }
+
+      if (!map.getLayer('arid_grid')) {
+        map.addLayer({
+          'id': 'arid_grid',
+          'type': 'line',
+          'source': 'contours',
+          'source-layer': 'arid_grid',
+          'layout': {
+            'line-join': 'round',
+            'line-cap': 'round',
+            'visibility': 'visible'
+          },
+          'paint': {
+            'line-color': '#ff69b4',
+            'line-width': 2,
+            'line-opacity': 0.8
+          },
+          'minzoom': 8,
+          'maxzoom': 24
+        });
+      }
+
+      // Fly to the center of the grid area
+      map.flyTo({
+        center: [46.587524, 24.911349],
+        zoom: 14,
+        essential: true
+      });
+      
+      console.log("Arid grid layer added successfully");
+    } catch (error) {
+      console.error("Error adding arid grid layer:", error);
+    }
+  };
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
