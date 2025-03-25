@@ -52,7 +52,8 @@ const initialState: MapState = {
   isCalculatingCoverage: false,
   deckglLayer: 'Hexgonlayer',
   isShowBuilding: false,
-  isShowCoveragePercetage: false
+  isShowCoveragePercetage: false,
+  suggestedHubsIsochrones: null,
 };
 
 const mapSlice = createSlice({
@@ -145,6 +146,9 @@ const mapSlice = createSlice({
     },
     setIsShowCoveragePercetage:  (state, action) => {
       state.isShowCoveragePercetage = action.payload; 
+    },
+    setSuggestedHubsIsochrones: (state, action) => {
+      state.suggestedHubsIsochrones = action.payload; 
     }
   },
 });
@@ -167,6 +171,7 @@ export const {
   setDeckglLayer,
   toggleBuildingShow,
   toggleRegionShow,
-  setIsShowCoveragePercetage
+  setIsShowCoveragePercetage,
+  setSuggestedHubsIsochrones
 } = mapSlice.actions;
 export default mapSlice.reducer;

@@ -20,6 +20,7 @@ import {
   setCalculatingCoverage,
   toggleBuildingShow,
   toggleRegionShow,
+  setSuggestedHubsIsochrones,
   setSuggestedHubs,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
@@ -65,7 +66,7 @@ function MapComponent() {
   const deckglLayer = useSelector((state: RootState) => state.map.deckglLayer);
   const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
   const isShowRegion = useSelector((state: RootState) => state.map.isShowRegion);
-  const isShowCoveragePercetage = useSelector((state: RootState) => state.map.isShowCoveragePercetage);
+  const suggestedHubsIsochrones = useSelector((state: RootState) => state.map.suggestedHubsIsochrones);
 
   // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -94,11 +95,21 @@ function MapComponent() {
   }>>([]);
   const [isFetchingIsochrones, setIsFetchingIsochrones] = useState(false);
   const suggestedHubsRef = useRef<IsochroneData[]>([]);
+  const [suggestedHubsIsochronesStats, setSuggestedHubsIsochronesStats] = useState<Array<{
+    provinceName: string;
+    totalArea: number;
+    coveredArea: number;
+    coveragePercentage: number;
+    hubCount: number;
+    timestamp: number;
+  }>>([]);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
     : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
+
+    console.log({suggestedHubStats})
   
   // Toggle 2D and 3D mode
   const handleToggle3DMode = () => {
@@ -415,6 +426,23 @@ function MapComponent() {
           }),
         ]
       : []),
+      ...(suggestedHubsIsochrones
+        ? [
+            new GeoJsonLayer({
+              id: "suggested-hubs-coverage",
+              data: suggestedHubsIsochrones.map((hub) => ({
+                type: "Feature",
+                geometry: JSON.parse(hub.coverage),
+                properties: {},
+              })),
+              getFillColor: [255, 140, 0, 120],
+              getLineColor: isNightMode 
+                ? [180, 0, 180, 200] 
+                : [220, 100, 0, 200], 
+              getLineWidth: 4,
+            }),
+          ]
+        : []),
     ...(isShowRegion ? [
       new GeoJsonLayer({
         id: 'province-polygons',
@@ -670,17 +698,11 @@ function MapComponent() {
       return;
     }
     
-    console.log("Suggested hubs received:", { 
-      hubCount: suggestedHubs.length
-    });
-    
     // Calculate the center of all suggested hubs
     const sumLon = suggestedHubs.reduce((sum, hub) => sum + hub.longitude, 0);
     const sumLat = suggestedHubs.reduce((sum, hub) => sum + hub.latitude, 0);
     const centerLon = sumLon / suggestedHubs.length;
     const centerLat = sumLat / suggestedHubs.length;
-    
-    console.log(`Flying to suggested hubs center: ${centerLat}, ${centerLon}`);
     
     // Add a small delay to ensure the map is ready
     setTimeout(() => {
@@ -697,6 +719,9 @@ function MapComponent() {
         }
       }
     }, 500);
+
+    // Calculate suggested hub stats when hubs are loaded
+    calculateSuggestedHubStats();
     
     // Fetch fresh isochrones for each suggested hub
     const fetchFreshIsochrones = async () => {
@@ -712,12 +737,11 @@ function MapComponent() {
         }));
         
         // Update the store immediately to show just the points
-        dispatch(setSuggestedHubs(hubsWithoutCoverage));
+        dispatch(setSuggestedHubsIsochrones(hubsWithoutCoverage));
         
         // Fetch fresh isochrones for each hub
         const updatedHubs = await Promise.all(
           suggestedHubs.map(async (hub, index) => {
-            console.log(`Fetching fresh isochrone for hub ${index} at ${hub.latitude},${hub.longitude}`);
             try {
               const response = await fetch(
                 `https://gh.bmapsbd.com/sau/isochrone?point=${
@@ -734,7 +758,6 @@ function MapComponent() {
               const isochroneData = await response.json();
               const geometry = transformIsochroneToGeometry(isochroneData);
               
-              console.log(`Successfully fetched isochrone for hub ${index}`);
               return {
                 ...hub,
                 coverage: geometry ? JSON.stringify(geometry) : null,
@@ -746,19 +769,16 @@ function MapComponent() {
           })
         );
         
-        console.log("All fresh isochrones fetched, updating state");
         // Update the suggestedHubs with fresh isochrone data
-        dispatch(setSuggestedHubs(updatedHubs));
+        dispatch(setSuggestedHubsIsochrones(updatedHubs));
+        
+        // Calculate coverage statistics for the fresh isochrones
+        calculateSuggestedHubsIsochronesStats(updatedHubs);
+        
         message.success({ 
           content: "Coverage calculated for suggested hubs", 
-          key: "suggestedHubsLoading", 
-          duration: 3 
+          key: "suggestedHubsLoading" 
         });
-        
-        // Calculate suggested hub stats
-        if (typeof calculateSuggestedHubStats === 'function') {
-          calculateSuggestedHubStats();
-        }
       } catch (error) {
         console.error("Error fetching fresh isochrones:", error);
         message.error("Failed to calculate coverage for suggested hubs");
@@ -777,7 +797,6 @@ function MapComponent() {
       suggestedHubsRef.current = [...suggestedHubs];
       
       // Fetch fresh isochrones
-      console.log("Fetching fresh isochrones for suggested hubs");
       fetchFreshIsochrones();
     }
     
@@ -977,6 +996,7 @@ function MapComponent() {
   
   // Add this function to calculate suggested hub coverage stats
   const calculateSuggestedHubStats = useCallback(async () => {
+    console.log("hereeeeeee")
     if (!suggestedHubs || suggestedHubs.length === 0) return;
     
     try {
@@ -1024,6 +1044,7 @@ function MapComponent() {
       
       // Calculate coverage percentage
       const coveragePercentage = riyadhArea > 0 ? (totalCoveredArea / riyadhArea) * 100 : 0;
+      console.log({coveragePercentage, })
       
       // Create a new stat entry with the current timestamp
       const newStat = {
@@ -1049,6 +1070,83 @@ function MapComponent() {
     }
   }, [suggestedHubs]);
 
+  // Update the calculateSuggestedHubsIsochronesStats function to preserve previous data
+  const calculateSuggestedHubsIsochronesStats = useCallback(async (hubs) => {
+    if (!hubs || hubs.length === 0) return;
+    
+    try {
+      let totalCoveredArea = 0;
+      
+      // Calculate the total coverage area from suggested hubs isochrones
+      hubs.forEach(hub => {
+        if (hub.coverage) {
+          try {
+            const coverage = typeof hub.coverage === 'string' 
+              ? JSON.parse(hub.coverage) 
+              : hub.coverage;
+            
+            if (coverage && coverage.coordinates) {
+              const coverageFeature = turf.polygon(coverage.coordinates);
+              const coverageArea = turf.area(coverageFeature);
+              totalCoveredArea += coverageArea;
+            }
+          } catch (error) {
+            console.error("Error parsing suggested hub isochrone coverage:", error);
+          }
+        }
+      });
+      
+      // Calculate Riyadh area using the same method as calculateCoverageStats
+      let riyadhArea = 0;
+      try {
+        // Assuming you have the GeoJSON data loaded
+        const geoJSONData = await fetch('/riyadh_city.json').then(res => res.json());
+        
+        // Find the Riyadh region in the GeoJSON data
+        geoJSONData.features.forEach(feature => {
+          const cityName = feature.properties.NAME_2;
+          
+          // Check if this is Riyadh (using any spelling variation)
+          if (cityName && cityName.toLowerCase().includes('riyad')) {
+            const regionFeature = turf.feature(feature.geometry);
+            const regionArea = turf.area(regionFeature);
+            riyadhArea += regionArea;
+          }
+        });
+      } catch (error) {
+        console.error("Error processing region data:", error);
+      }
+      
+      // Calculate coverage percentage
+      const coveragePercentage = riyadhArea > 0 ? (totalCoveredArea / riyadhArea) * 100 : 0;
+      
+      // Create a new stat entry with the current timestamp
+      const newStat = {
+        provinceName: "Riyadh",
+        totalArea: riyadhArea,
+        coveredArea: totalCoveredArea,
+        coveragePercentage: coveragePercentage,
+        hubCount: hubs.length,
+        timestamp: Date.now()
+      };
+      
+      // Update state with the calculated stats - remove any existing entry with the same hub count
+      setSuggestedHubsIsochronesStats(prevStats => {
+        // Filter out any existing stats with the same hub count
+        const filteredStats = prevStats.filter(stat => stat.hubCount !== hubs.length);
+        // Add the new stat
+        return [...filteredStats, newStat];
+      });
+      
+      // Show the coverage stats panel
+      setShowCoverageStats(true);
+      
+    } catch (error) {
+      console.error("Error calculating suggested hubs isochrones stats:", error);
+      message.error("Failed to calculate suggested hubs isochrones coverage statistics");
+    }
+  }, []);
+
   // Combine both calculations in one function
   const handleCalculateCoverage = useCallback(() => {
     setShowCoverageStats(prev => !prev);
@@ -1068,17 +1166,18 @@ function MapComponent() {
     }
   }, [showCoverageStats, calculateCoverageStats, suggestedHubs, calculateSuggestedHubStats]);
 
-  // Update the CoverageStatsPanel to include suggested hub stats
+  // Update the CoverageStatsPanel to use the new state
   const CoverageStatsPanel = useMemo(() => {
     if (!showCoverageStats) return null;
     
     // Sort the stats by time limit
-    // const sortedStats = [...coverageStats].sort((a, b) => a.timeLimit - b.timeLimit);
     const sortedStats = coverageStats;
     
-    // Sort suggested hub stats by timestamp
-    // const sortedSuggestedStats = [...suggestedHubStats].sort((a, b) => a.timestamp - b.timestamp);
+    // Get suggested hub stats
     const sortedSuggestedStats = suggestedHubStats;
+    
+    // Get isochrone stats from the dedicated state
+    const isochroneStats = suggestedHubsIsochronesStats;
     
     return (
       <div className="absolute top-[260px] right-10 bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
@@ -1131,7 +1230,7 @@ function MapComponent() {
         {sortedSuggestedStats.length > 0 && suggestedHubs && suggestedHubs.length > 0 && (
           <>
             <h4 className="font-semibold text-md mb-2">Suggested Hub Coverage</h4>
-            <table className="w-full text-sm border">
+            <table className="w-full text-sm border mb-4">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-3 border-r">Region</th>
@@ -1162,32 +1261,80 @@ function MapComponent() {
                 ))}
               </tbody>
             </table>
-            
-            {/* Comparison section */}
-            {sortedStats.length > 0 && sortedSuggestedStats.length > 0 && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <h4 className="font-semibold text-md mb-2">Coverage Comparison</h4>
-                <p className="text-sm">
-                  <span className="font-medium">Improvement: </span>
-                  {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage - 
-                    sortedStats[sortedStats.length - 1].coveragePercentage).toFixed(2)}% 
-                  {sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage > 
-                    sortedStats[sortedStats.length - 1].coveragePercentage 
-                    ? " increase" 
-                    : " decrease"} in coverage
-                </p>
-                {/* <p className="text-sm mt-1">
-                  <span className="font-medium">Hub Efficiency: </span>
-                  {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveredArea / 
-                    sortedSuggestedStats[sortedSuggestedStats.length - 1].hubCount / 1000000).toFixed(2)} km² per hub
-                </p> */}
-              </div>
-            )}
           </>
+        )}
+        
+        {/* Coverage with Walking Distance Stats */}
+        {isochroneStats.length > 0 && suggestedHubsIsochrones && suggestedHubsIsochrones.length > 0 && (
+          <>
+            <h4 className="font-semibold text-md mb-2">Coverage with Walking Distance</h4>
+            <table className="w-full text-sm border mb-4">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3 border-r">Region</th>
+                  <th className="text-right py-2 px-3 border-r">Hubs</th>
+                  <th className="text-right py-2 px-3 border-r">Area (km²)</th>
+                  <th className="text-right py-2 px-3 border-r">Coverage (km²)</th>
+                  <th className="text-right py-2 px-3">Coverage %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isochroneStats.map((stat, index) => (
+                  <tr 
+                    key={index} 
+                    className={index === isochroneStats.length - 1 ? "border-b font-bold bg-orange-50" : "border-b"}
+                  >
+                    <td className="py-2 px-3 border-r">{stat.provinceName}</td>
+                    <td className="text-right py-2 px-3 border-r">{stat.hubCount}</td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.totalArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3 border-r">
+                      {(stat.coveredArea / 1000000).toFixed(2)}
+                    </td>
+                    <td className="text-right py-2 px-3">
+                      {stat.coveragePercentage.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+        
+        {/* Comparison section */}
+        {sortedStats.length > 0 && (sortedSuggestedStats.length > 0 || isochroneStats.length > 0) && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <h4 className="font-semibold text-md mb-2">Coverage Comparison</h4>
+            
+            {sortedSuggestedStats.length > 0 && (
+              <p className="text-sm mb-2">
+                <span className="font-medium">Suggested Hubs Improvement: </span>
+                {(sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage - 
+                  sortedStats[sortedStats.length - 1].coveragePercentage).toFixed(2)}% 
+                {sortedSuggestedStats[sortedSuggestedStats.length - 1].coveragePercentage > 
+                  sortedStats[sortedStats.length - 1].coveragePercentage 
+                  ? " increase" 
+                  : " decrease"} in coverage
+              </p>
+            )}
+            
+            {isochroneStats.length > 0 && (
+              <p className="text-sm">
+                <span className="font-medium">Walking Distance Improvement: </span>
+                {(isochroneStats[isochroneStats.length - 1].coveragePercentage - 
+                  sortedStats[sortedStats.length - 1].coveragePercentage).toFixed(2)}% 
+                {isochroneStats[isochroneStats.length - 1].coveragePercentage > 
+                  sortedStats[sortedStats.length - 1].coveragePercentage 
+                  ? " increase" 
+                  : " decrease"} in coverage
+              </p>
+            )}
+          </div>
         )}
       </div>
     );
-  }, [showCoverageStats, coverageStats, suggestedHubStats, suggestedHubs]);
+  }, [showCoverageStats, coverageStats, suggestedHubStats, suggestedHubsIsochronesStats, suggestedHubs, suggestedHubsIsochrones]);
 
   // Add this inside your component, before the return statement
   useEffect(() => {
