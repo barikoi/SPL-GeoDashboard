@@ -38,6 +38,8 @@ interface MapState {
   isShowBuilding: boolean;
   isShowRegion: boolean;
   isShowCoveragePercetage: boolean;
+  suggestedHubsIsochrones: any[];
+  isShowRiyadhCity: boolean;
 }
 
 const initialState: MapState = {
@@ -54,6 +56,7 @@ const initialState: MapState = {
   isShowBuilding: false,
   isShowCoveragePercetage: false,
   suggestedHubsIsochrones: null,
+  isShowRiyadhCity: false,
 };
 
 const mapSlice = createSlice({
@@ -144,6 +147,9 @@ const mapSlice = createSlice({
     toggleRegionShow: (state) => {
       state.isShowRegion = !state.isShowRegion; 
     },
+    toggleRiyadhCityShow: (state) => {
+      state.isShowRiyadhCity = !state.isShowRiyadhCity; 
+    },
     setIsShowCoveragePercetage:  (state, action) => {
       state.isShowCoveragePercetage = action.payload; 
     },
@@ -172,6 +178,7 @@ export const {
   toggleBuildingShow,
   toggleRegionShow,
   setIsShowCoveragePercetage,
-  setSuggestedHubsIsochrones
+  setSuggestedHubsIsochrones,
+  toggleRiyadhCityShow
 } = mapSlice.actions;
 export default mapSlice.reducer;

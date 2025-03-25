@@ -22,9 +22,10 @@ import {
   toggleRegionShow,
   setSuggestedHubsIsochrones,
   setSuggestedHubs,
+  toggleRiyadhCityShow,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import { Progress, message } from "antd"; 
+import { Progress, message, Button, Tooltip } from "antd"; 
 import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
@@ -34,7 +35,7 @@ import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/ma
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
 import { FaEye, FaEyeSlash, FaCalculator } from "react-icons/fa";
-import { HeatMapOutlined } from "@ant-design/icons";
+import { HeatMapOutlined, BorderOutlined } from "@ant-design/icons";
 import * as turf from '@turf/turf';
 
 const INITIAL_VIEW_STATE = {
@@ -67,6 +68,7 @@ function MapComponent() {
   const isShowBuilding = useSelector((state: RootState) => state.map.isShowBuilding);
   const isShowRegion = useSelector((state: RootState) => state.map.isShowRegion);
   const suggestedHubsIsochrones = useSelector((state: RootState) => state.map.suggestedHubsIsochrones);
+  const isShowRiyadhCity = useSelector((state: RootState) => state.map.isShowRiyadhCity);
 
   // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -103,6 +105,7 @@ function MapComponent() {
     hubCount: number;
     timestamp: number;
   }>>([]);
+  const [riyadhCityData, setRiyadhCityData] = useState<any>(null);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
@@ -214,6 +217,7 @@ function MapComponent() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasUploadedRef = useRef(false); // Track if upload has been performed
 
+  // Fetch isochrones using the uploaded hub locations
   useEffect(() => {
     if (showIsochrones) {
       // Cancel any pending requests
@@ -375,6 +379,7 @@ function MapComponent() {
   //   }
   // }, [datasets.length]); // Only trigger when the number of datasets changes
 
+  // All the map layers
   const layers = [
     ...datasets
       .filter((dataset) => dataset.visible)
@@ -403,6 +408,42 @@ function MapComponent() {
         }),
       ]),
     ...(isochronesCalculated ? isochroneLayers : []),
+    ...(isShowRiyadhCity && riyadhCityData ? [
+      new GeoJsonLayer({
+        id: 'riyadh-city-layer',
+        data: riyadhCityData,
+        getFillColor: isNightMode 
+        ? [144, 238, 144, 80] // Light green for night mode with good opacity
+        : [204, 85, 0, 70], // Burnt orange/amber for day mode with better opacity
+      getLineColor: isNightMode 
+        ? [0, 128, 0, 200] // Darker green border for night mode
+        : [255, 69, 0, 200], // Orange border for day mode
+        getLineWidth: 3,
+        pickable: true,
+        stroked: true,
+        filled: true,
+        wireframe: true,
+        // @ts-ignore
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: {
+                properties: {
+                  name: info.object.properties.NAME_2,
+                  type: "Riyadh City"
+                }
+              },
+              x: info.x,
+              y: info.y,
+              // @ts-ignore
+              type: "riyadh-city"
+            });
+          } else {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : []),
     ...(suggestedHubs
       ? [
           new GeoJsonLayer({
@@ -1185,7 +1226,7 @@ function MapComponent() {
           <h3 className="font-bold text-lg">Coverage Statistics</h3>
           <button 
             onClick={() => setShowCoverageStats(false)}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 ml-2"
           >
             ×
           </button>
@@ -1351,6 +1392,21 @@ function MapComponent() {
     };
   }, []); // Make sure to include calculateCoverageStats in the dependency array
 
+  // Load Riyadh city data
+  useEffect(() => {
+    const loadRiyadhCityData = async () => {
+      try {
+        const response = await fetch('/riyadh_city.json');
+        const data = await response.json();
+        setRiyadhCityData(data);
+      } catch (error) {
+        console.error('Error loading Riyadh city data:', error);
+      }
+    };
+
+    loadRiyadhCityData();
+  }, [])
+
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
       {/* <DeckGL 
@@ -1401,6 +1457,12 @@ function MapComponent() {
               onClick={handleCalculateCoverage}
               icon={<FaCalculator color="#333333" />}
               isActive={showCoverageStats}
+            />
+            <MapControlButton
+              title={isShowRiyadhCity ? "Hide Riyadh City" : "Show Riyadh City"}
+              onClick={() => dispatch(toggleRiyadhCityShow())}
+              icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >R</span> }
+              isActive={isShowRiyadhCity}
             />
           </div>
           <DeckGLOverlay layers={ layers } />
