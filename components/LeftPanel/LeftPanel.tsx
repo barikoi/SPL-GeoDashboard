@@ -14,7 +14,10 @@ import {
   toggleNightMode,
   setDeckglLayer,
   toggleBuildingShow,
-  setIsShowCoveragePercetage
+  setIsShowCoveragePercetage,
+  toggleSuggestedHubsVisibility,
+  toggleWalkingDistanceVisibility,
+  setIsGetSuggestedHubsWalkingDistanceButtonClicked
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -27,7 +30,7 @@ import {
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "../../app/images/SPL_Logo.webp";
-import { Progress, message, Spin, Tooltip, Switch, Radio } from "antd";
+import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
 import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
@@ -74,6 +77,10 @@ const LeftPanel = () => {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
   const isCalculatingCoverage = useSelector((state: RootState) => state.map.isCalculatingCoverage);
+  const suggestedHubsVisible = useSelector((state: RootState) => state.map.suggestedHubsVisible);
+  const isShowSuggestedHubsCoverage = useSelector((state: RootState) => state.map.isShowSuggestedHubsCoverage);
+  const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
+  const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
 
   const options: CheckboxGroupProps<string>['options'] = [
     { 
@@ -101,7 +108,6 @@ const LeftPanel = () => {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !files[0]) {
-      // Only reset the file input, don't change the fileUploaded state
       e.target.value = '';
       return;
     }
@@ -112,7 +118,6 @@ const LeftPanel = () => {
     const isFileAlreadyUploaded = datasets.some(dataset => dataset.name === file.name);
     if (isFileAlreadyUploaded) {
       message.error("This file has already been uploaded. Please upload a different file.");
-      // Reset the file input
       e.target.value = '';
       return;
     }
@@ -132,7 +137,6 @@ const LeftPanel = () => {
               header: true,
               dynamicTyping: true,
               complete: (result) => {
-                // Validate required columns
                 const headers = result.meta.fields || [];
                 const requiredColumns = ['City', 'Latitude', 'Longitude'];
                 const missingColumns = requiredColumns.filter(col => 
@@ -144,17 +148,14 @@ const LeftPanel = () => {
                     `Missing required columns: ${missingColumns.join(', ')}. ` +
                     'Please ensure your file contains City, Latitude, and Longitude columns.'
                   );
-                  // Reset the file input
                   const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
                   if (fileInput) fileInput.value = '';
                   return;
                 }
 
-                // Check for coverage column
                 const hasCoverage = checkForCoverageColumn(result.data);
                 setHasCoverageColumn(hasCoverage);
                 
-                // Normalize and add dataset
                 const normalizedData = normalizeData(result.data, "csv");
                 dispatch(
                   addDataset({
@@ -165,6 +166,10 @@ const LeftPanel = () => {
                     color,
                     strokedColor,
                     originalFile: result.data,
+                    layerIds: {
+                      coverage: `coverage-layer-${id}`,
+                      scatterplot: `scatterplot-layer-${id}`
+                    }
                   })
                 );
                 setFileUploaded(true);
@@ -172,7 +177,6 @@ const LeftPanel = () => {
               error: (error) => {
                 console.error("Error parsing CSV file:", error);
                 message.error("Failed to parse CSV file");
-                // Reset the file input
                 const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
               }
@@ -180,13 +184,11 @@ const LeftPanel = () => {
           } else if (file.name.endsWith(".json")) {
             const jsonData = JSON.parse(content);
             
-            // Validate required fields in JSON
             const firstItem = jsonData[0];
             if (!firstItem || !firstItem.City || !firstItem.Latitude || !firstItem.Longitude) {
               message.error(
                 'JSON file must contain City, Latitude, and Longitude fields'
               );
-              // Reset the file input
               const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
               if (fileInput) fileInput.value = '';
               return;
@@ -203,6 +205,10 @@ const LeftPanel = () => {
                 color,
                 strokedColor,
                 originalFile: jsonData,
+                layerIds: {
+                  coverage: `coverage-layer-${id}`,
+                  scatterplot: `scatterplot-layer-${id}`
+                }
               })
             );
             setFileUploaded(true);
@@ -210,7 +216,6 @@ const LeftPanel = () => {
         } catch (error) {
           console.error("Error parsing file:", error);
           message.error("Failed to parse file");
-          // Reset the file input
           const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
           if (fileInput) fileInput.value = '';
         }
@@ -220,7 +225,6 @@ const LeftPanel = () => {
     reader.onerror = () => {
       console.error("Error reading file");
       message.error("Failed to read file");
-      // Reset the file input
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
     };
@@ -431,6 +435,11 @@ const LeftPanel = () => {
     }
   };
 
+  const handleGetSuggestedHubsWalkingDistance = () => {
+    console.log("yes")
+    dispatch(setIsGetSuggestedHubsWalkingDistanceButtonClicked())
+  }
+
   const onLayerChange = (e:any) => {
     const layer = e.target.value
     dispatch(setDeckglLayer(layer))
@@ -438,6 +447,8 @@ const LeftPanel = () => {
 
   // Change this condition
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
+
+  console.log({isShowWalkingDistanceVisibility})
 
   return (
     <div
@@ -631,21 +642,27 @@ const LeftPanel = () => {
                 </span>
               </Tooltip>
             </label>
-            <input
+            <Input
               type="number"
-              value={timeLimit}
-              onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
-              min="1"
-              max="60"
+              value={timeLimit || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  dispatch(setTimeLimit(0));
+                } else {
+                  dispatch(setTimeLimit(Number(value)));
+                }
+              }}
+              min={1}
+              max={60}
               disabled={isCalculatingCoverage}
-              className={`w-full p-1.5 border rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs ${
-                isNightMode
-                  ? "bg-gray-600 border-gray-500 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-800"
-              } ${
-                isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""
-              }`}
               placeholder="1-60 minutes"
+              className={`${isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""}`}
+              style={{ 
+                backgroundColor: isNightMode ? '#4B5563' : '#FFFFFF',
+                borderColor: isNightMode ? '#6B7280' : '#D1D5DB',
+                color: isNightMode ? '#F9FAFB' : '#1F2937'
+              }}
             />
           </div>
 
@@ -820,7 +837,7 @@ const LeftPanel = () => {
       {/* Suggested Hubs Section - more compact */}
       {
         <div
-          className={`p-3 rounded-lg shadow-sm ${
+          className={`mb-4 p-3 rounded-lg shadow-sm ${
             isNightMode ? "bg-gray-700" : "bg-white"
           }`}
         >
@@ -839,14 +856,96 @@ const LeftPanel = () => {
 
           {suggestedHubsCount !== null && (
             <div
-              className={`mt-2 p-1.5 rounded-lg text-xs text-center ${
-                isNightMode
-                  ? "bg-purple-800 border-purple-700 text-purple-100"
-                  : "bg-purple-50 border-purple-200 text-purple-700"
+              className={`flex items-center justify-between mt-2 mb-2 p-1.5 rounded-lg ${
+                isNightMode ? "bg-gray-600" : "bg-gray-50"
               }`}
             >
-              Found {suggestedHubsCount} suggested hub
-              {suggestedHubsCount !== 1 ? "s" : ""}
+              <div className="flex items-center">
+                <button
+                  onClick={() => dispatch(toggleSuggestedHubsVisibility())}
+                  className={`mr-2 ${
+                    isNightMode ? "text-gray-300" : "text-gray-500"
+                  } hover:text-blue-500 transition-colors`}
+                >
+                  {isShowSuggestedHubsCoverage ? (
+                    <FaEye size={14} />
+                  ) : (
+                    <FaEyeSlash size={14} />
+                  )}
+                </button>
+                <div
+                  className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: isNightMode ?  "rgb(145, 245, 173)" :  "rgb(251, 75, 78, 80)"
+                  }}
+                />
+                <span
+                  className={`text-xs font-medium ${
+                    isNightMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+                >
+                  Found {suggestedHubsCount} suggested hub
+                  {suggestedHubsCount !== 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      }
+      {/* Suggested Hubs with Walking Distance Section - more compact */}
+      {
+        <div
+          className={`p-3 rounded-lg shadow-sm ${
+            isNightMode ? "bg-gray-700" : "bg-white"
+          }`}
+        >
+          <button
+            onClick={handleGetSuggestedHubsWalkingDistance}
+            disabled={isFetchingIsochrones}
+            className={`w-full py-1.5 px-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm text-xs font-medium ${
+              isFetchingIsochrones ? "opacity-75 cursor-not-allowed" : ""
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-1.5">
+              <span>Get Suggested Hubs Walking Distance</span>
+              {isFetchingIsochrones && <Spin size="small" />}
+            </div>
+          </button>
+
+          {suggestedHubsCount !== null && (
+            <div
+              className={`flex items-center justify-between mt-2 mb-2 p-1.5 rounded-lg ${
+                isNightMode ? "bg-gray-600" : "bg-gray-50"
+              }`}
+            >
+              <div className="flex items-center">
+                <button
+                  onClick={() => dispatch(toggleWalkingDistanceVisibility())}
+                  className={`mr-2 ${
+                    isNightMode ? "text-gray-300" : "text-gray-500"
+                  } hover:text-blue-500 transition-colors`}
+                >
+                  {isShowWalkingDistanceVisibility ? (
+                    <FaEye size={14} />
+                  ) : (
+                    <FaEyeSlash size={14} />
+                  )}
+                </button>
+                <div
+                  className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: "rgb(255, 140, 0, 120)",
+                  }}
+                />
+                <span
+                  className={`text-xs font-medium ${
+                    isNightMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+                >
+                  Suggested hub
+                  {suggestedHubsCount !== 1 ? "s" : ""} walking distance
+                </span>
+              </div>
             </div>
           )}
         </div>

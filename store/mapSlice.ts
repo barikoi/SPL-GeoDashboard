@@ -40,6 +40,10 @@ interface MapState {
   isShowCoveragePercetage: boolean;
   suggestedHubsIsochrones: any[];
   isShowRiyadhCity: boolean;
+  isShowSuggestedHubsCoverage: boolean;
+  isShowWalkingDistanceVisibility: boolean;
+  isGetSuggestedHubsWalkingDistanceButtonClicked: boolean;
+  isFetchingIsochrones: boolean;
 }
 
 const initialState: MapState = {
@@ -57,6 +61,10 @@ const initialState: MapState = {
   isShowCoveragePercetage: false,
   suggestedHubsIsochrones: null,
   isShowRiyadhCity: false,
+  isShowSuggestedHubsCoverage: true,
+  isShowWalkingDistanceVisibility: true,
+  isGetSuggestedHubsWalkingDistanceButtonClicked: false,
+  isFetchingIsochrones: false
 };
 
 const mapSlice = createSlice({
@@ -150,12 +158,24 @@ const mapSlice = createSlice({
     toggleRiyadhCityShow: (state) => {
       state.isShowRiyadhCity = !state.isShowRiyadhCity; 
     },
+    toggleSuggestedHubsVisibility: (state) => {
+      state.isShowSuggestedHubsCoverage = !state.isShowSuggestedHubsCoverage; 
+    },
     setIsShowCoveragePercetage:  (state, action) => {
       state.isShowCoveragePercetage = action.payload; 
     },
     setSuggestedHubsIsochrones: (state, action) => {
       state.suggestedHubsIsochrones = action.payload; 
-    }
+    }, 
+    setIsGetSuggestedHubsWalkingDistanceButtonClicked: (state) => {
+      state.isGetSuggestedHubsWalkingDistanceButtonClicked = !state.isGetSuggestedHubsWalkingDistanceButtonClicked; 
+    },
+    toggleWalkingDistanceVisibility: (state) => {
+      state.isShowWalkingDistanceVisibility = !state.isShowWalkingDistanceVisibility; 
+    }, 
+    setIsFetchingIsochrones: (state, action) => {
+      state.isFetchingIsochrones = action.payload; 
+    },
   },
 });
 
@@ -179,6 +199,10 @@ export const {
   toggleRegionShow,
   setIsShowCoveragePercetage,
   setSuggestedHubsIsochrones,
-  toggleRiyadhCityShow
+  toggleRiyadhCityShow,
+  toggleSuggestedHubsVisibility,
+  toggleWalkingDistanceVisibility,
+  setIsGetSuggestedHubsWalkingDistanceButtonClicked,
+  setIsFetchingIsochrones
 } = mapSlice.actions;
 export default mapSlice.reducer;
