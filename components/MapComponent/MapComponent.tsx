@@ -75,6 +75,7 @@ function MapComponent() {
   const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
   const isGetSuggestedHubsWalkingDistanceButtonClicked = useSelector((state: RootState) => state.map.isGetSuggestedHubsWalkingDistanceButtonClicked);
   const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
+  const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
 
   // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -117,8 +118,6 @@ function MapComponent() {
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
     : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
-
-    console.log({suggestedHubStats})
   
   // Toggle 2D and 3D mode
   const handleToggle3DMode = () => {
@@ -238,7 +237,11 @@ function MapComponent() {
       const fetchIsochrones = async () => {
         dispatch(setCalculatingCoverage(true));
         try {
-          for (const dataset of datasets) {
+          // Filter datasets based on uploaded_file_for and selectedOptionForWalkableCoverage
+          const filteredDatasets = datasets.filter(dataset => 
+            dataset.uploaded_file_for === selectedOptionForWalkableCoverage
+          );
+          for (const dataset of filteredDatasets) {
             if (dataset.visible) {
               const updatedData = await Promise.all(
                 dataset.data.map(async (point) => {
@@ -333,7 +336,8 @@ function MapComponent() {
       };
 
       // Add a debounce delay to prevent rapid successive calls
-      const debounceTimeout = setTimeout(fetchIsochrones, 500);
+      // const debounceTimeout = setTimeout(fetchIsochrones, 3000);
+      const debounceTimeout = fetchIsochrones();
 
       // Cleanup function
       return () => {
@@ -343,7 +347,7 @@ function MapComponent() {
         }
       };
     }
-  }, [showIsochrones, datasets, dispatch, timeLimit]);
+  }, [showIsochrones, datasets, dispatch, timeLimit, selectedOptionForWalkableCoverage]);
 
   // Add useEffect to listen for population file changes
   useEffect(() => {
@@ -946,32 +950,70 @@ function MapComponent() {
         console.error("Error processing region data:", error);
       }
 
-      datasets.forEach(dataset => {
-        if (dataset.visible) {
-          dataset.data.forEach((point: any) => {
-            if (point.coverage) {
-              try {
-                const coverage = typeof point.coverage === 'string' 
-                  ? JSON.parse(point.coverage) 
-                  : point.coverage;
+      if(selectedOptionForWalkableCoverage === "parcelat"){
+        console.log({selectedOptionForWalkableCoverage})
+        datasets
+          .filter(dataset => dataset.uploaded_file_for === "parcelat")
+          .forEach(dataset => {
+          if (dataset.visible) {
+            dataset.data.forEach((point: any) => {
+              if (point.coverage) {
+                try {
+                  const coverage = typeof point.coverage === 'string' 
+                    ? JSON.parse(point.coverage) 
+                    : point.coverage;
 
-                if (coverage && coverage.coordinates) {
-                  const coverageFeature = turf.polygon(coverage.coordinates);
-                  allCoverageFeatures.push(coverageFeature);
+                  if (coverage && coverage.coordinates) {
+                    const coverageFeature = turf.polygon(coverage.coordinates);
+                    allCoverageFeatures.push(coverageFeature);
+                    
+                    // Calculate area
+                    const coverageArea = turf.area(coverageFeature);
+                    totalCoverageArea += coverageArea;
+                    
+                    // Check if this point is in Riyadh
+                    // We'll use the City field from the original data
+                    const originalPoint = dataset.originalFile.find(
+                      (op: any) => 
+                        op.latitude === point.latitude && 
+                        op.longitude === point.longitude
+                    );
+
+                    if (originalPoint && isRiyadh(originalPoint.properties.City || originalPoint.properties.city)) {
+                      // Add to Riyadh region
+                      if (!regionCoverage["Riyadh"]) {
+                        regionCoverage["Riyadh"] = { 
+                          totalArea: 0, 
+                          coveredArea: 0, 
+                          coveragePercentage: 0 
+                        };
+                      }
+                      regionCoverage["Riyadh"].coveredArea += coverageArea;
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error parsing coverage:", error);
+                }
+              } else {
+                // Create default coverage for points without coverage data
+                if (point.latitude && point.longitude) {
+                  const center = [parseFloat(point.longitude), parseFloat(point.latitude)];
+                  const radius = 5; // 5 kilometers
+                  const options = { steps: 64, units: 'kilometers' as turf.Units };
+                  const circle = turf.circle(center, radius, options);
+                  allCoverageFeatures.push(circle);
                   
-                  // Calculate area
-                  const coverageArea = turf.area(coverageFeature);
+                  const coverageArea = turf.area(circle);
                   totalCoverageArea += coverageArea;
                   
                   // Check if this point is in Riyadh
-                  // We'll use the City field from the original data
                   const originalPoint = dataset.originalFile.find(
                     (op: any) => 
                       op.latitude === point.latitude && 
                       op.longitude === point.longitude
                   );
-
-                  if (originalPoint && isRiyadh(originalPoint.properties.City)) {
+                  
+                  if (originalPoint && isRiyadh(originalPoint.City || originalPoint.city)) {
                     // Add to Riyadh region
                     if (!regionCoverage["Riyadh"]) {
                       regionCoverage["Riyadh"] = { 
@@ -983,44 +1025,94 @@ function MapComponent() {
                     regionCoverage["Riyadh"].coveredArea += coverageArea;
                   }
                 }
-              } catch (error) {
-                console.error("Error parsing coverage:", error);
               }
-            } else {
-              // Create default coverage for points without coverage data
-              if (point.latitude && point.longitude) {
-                const center = [parseFloat(point.longitude), parseFloat(point.latitude)];
-                const radius = 5; // 5 kilometers
-                const options = { steps: 64, units: 'kilometers' as turf.Units };
-                const circle = turf.circle(center, radius, options);
-                allCoverageFeatures.push(circle);
-                
-                const coverageArea = turf.area(circle);
-                totalCoverageArea += coverageArea;
-                
-                // Check if this point is in Riyadh
-                const originalPoint = dataset.originalFile.find(
-                  (op: any) => 
-                    op.latitude === point.latitude && 
-                    op.longitude === point.longitude
-                );
-                
-                if (originalPoint && isRiyadh(originalPoint.City)) {
-                  // Add to Riyadh region
-                  if (!regionCoverage["Riyadh"]) {
-                    regionCoverage["Riyadh"] = { 
-                      totalArea: 0, 
-                      coveredArea: 0, 
-                      coveragePercentage: 0 
-                    };
+            });
+          }
+        });
+      }
+
+      if(selectedOptionForWalkableCoverage === "competitor"){
+        console.log({selectedOptionForWalkableCoverage, datasets})
+        datasets
+          .filter(dataset => dataset.uploaded_file_for === "competitor")
+          .forEach(dataset => {
+          if (dataset.visible) {
+            dataset.data.forEach((point: any) => {
+              if (point.coverage) {
+                try {
+                  const coverage = typeof point.coverage === 'string' 
+                    ? JSON.parse(point.coverage) 
+                    : point.coverage;
+
+                  if (coverage && coverage.coordinates) {
+                    const coverageFeature = turf.polygon(coverage.coordinates);
+                    allCoverageFeatures.push(coverageFeature);
+                    
+                    // Calculate area
+                    const coverageArea = turf.area(coverageFeature);
+                    totalCoverageArea += coverageArea;
+                    
+                    // Check if this point is in Riyadh
+                    // We'll use the City field from the original data
+                    const originalPoint = dataset.originalFile.find(
+                      (op: any) => 
+                        op.latitude === point.latitude && 
+                        op.longitude === point.longitude
+                    );
+
+                    if (originalPoint && isRiyadh(originalPoint.properties.City || originalPoint.properties.city)) {
+                      // Add to Riyadh region
+                      if (!regionCoverage["Riyadh"]) {
+                        regionCoverage["Riyadh"] = { 
+                          totalArea: 0, 
+                          coveredArea: 0, 
+                          coveragePercentage: 0 
+                        };
+                      }
+                      regionCoverage["Riyadh"].coveredArea += coverageArea;
+                    }
                   }
-                  regionCoverage["Riyadh"].coveredArea += coverageArea;
+                } catch (error) {
+                  console.error("Error parsing coverage:", error);
+                }
+              } else {
+                // Create default coverage for points without coverage data
+                if (point.latitude && point.longitude) {
+                  const center = [parseFloat(point.longitude), parseFloat(point.latitude)];
+                  const radius = 5; // 5 kilometers
+                  const options = { steps: 64, units: 'kilometers' as turf.Units };
+                  const circle = turf.circle(center, radius, options);
+                  allCoverageFeatures.push(circle);
+                  
+                  const coverageArea = turf.area(circle);
+                  totalCoverageArea += coverageArea;
+                  
+                  // Check if this point is in Riyadh
+                  const originalPoint = dataset.originalFile.find(
+                    (op: any) => 
+                      op.latitude === point.latitude && 
+                      op.longitude === point.longitude
+                  );
+                  
+                  if (originalPoint && isRiyadh(originalPoint.City || originalPoint.city)) {
+                    // Add to Riyadh region
+                    if (!regionCoverage["Riyadh"]) {
+                      regionCoverage["Riyadh"] = { 
+                        totalArea: 0, 
+                        coveredArea: 0, 
+                        coveragePercentage: 0 
+                      };
+                    }
+                    regionCoverage["Riyadh"].coveredArea += coverageArea;
+                  }
                 }
               }
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+      }
+
+      console.log({regionCoverage})
 
       // Calculate percentages for each region
       Object.entries(regionCoverage).forEach(([regionName, region]) => {
@@ -1055,7 +1147,7 @@ function MapComponent() {
       console.error("Error calculating coverage stats:", error);
       message.error("Error calculating coverage statistics");
     }
-  }, [datasets, provincePolygons, timeLimit]);
+  }, [datasets, provincePolygons, timeLimit, selectedOptionForWalkableCoverage]);
   
   // Add this function to calculate suggested hub coverage stats
   const calculateSuggestedHubStats = useCallback(async () => {
@@ -1106,7 +1198,6 @@ function MapComponent() {
       
       // Calculate coverage percentage
       const coveragePercentage = riyadhArea > 0 ? (totalCoveredArea / riyadhArea) * 100 : 0;
-      console.log({coveragePercentage, })
       
       // Create a new stat entry with the current timestamp
       const newStat = {

@@ -1,5 +1,7 @@
-import React from 'react';
 
+import React from 'react';
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 interface CoverageStatsProps {
   showCoverageStats: boolean;
   coverageStats: Array<{
@@ -39,6 +41,8 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
   suggestedHubsIsochrones,
   onClose
 }) => {
+  const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
+  
   if (!showCoverageStats) return null;
 
   // Sort the stats by time limit
@@ -49,11 +53,12 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
   
   // Get isochrone stats from the dedicated state
   const isochroneStats = suggestedHubsIsochronesStats;
+
   
   return (
     <div className="absolute right-10 top-[153px] bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-bold text-lg">Coverage Statistics</h3>
+        <h3 className="font-bold text-lg">Coverage Statistics <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span></h3>
         <button 
           onClick={onClose}
           className="text-gray-500 hover:text-gray-700 ml-2"

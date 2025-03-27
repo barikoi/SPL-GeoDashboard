@@ -44,6 +44,8 @@ interface MapState {
   isShowWalkingDistanceVisibility: boolean;
   isGetSuggestedHubsWalkingDistanceButtonClicked: boolean;
   isFetchingIsochrones: boolean;
+  isWalkableCoverageModalVisible: boolean;
+  selectedOptionForWalkableCoverage: 'parcelat' | 'competitor'
 }
 
 const initialState: MapState = {
@@ -64,7 +66,9 @@ const initialState: MapState = {
   isShowSuggestedHubsCoverage: true,
   isShowWalkingDistanceVisibility: true,
   isGetSuggestedHubsWalkingDistanceButtonClicked: false,
-  isFetchingIsochrones: false
+  isFetchingIsochrones: false,
+  isWalkableCoverageModalVisible: false,
+  selectedOptionForWalkableCoverage: 'parcelat'
 };
 
 const mapSlice = createSlice({
@@ -176,6 +180,13 @@ const mapSlice = createSlice({
     setIsFetchingIsochrones: (state, action) => {
       state.isFetchingIsochrones = action.payload; 
     },
+    setIsWalkableCoverageModalVisible: (state, action) => {
+      state.isWalkableCoverageModalVisible = action.payload; 
+    },
+    setSelectedOptionForWalkableCoverage: (state, action) => {
+      state.selectedOptionForWalkableCoverage = action.payload; 
+      console.log(state.selectedOptionForWalkableCoverage, "state.selectedOptionForWalkableCoverage")
+    }
   },
 });
 
@@ -203,6 +214,8 @@ export const {
   toggleSuggestedHubsVisibility,
   toggleWalkingDistanceVisibility,
   setIsGetSuggestedHubsWalkingDistanceButtonClicked,
-  setIsFetchingIsochrones
+  setIsFetchingIsochrones,
+  setIsWalkableCoverageModalVisible,
+  setSelectedOptionForWalkableCoverage
 } = mapSlice.actions;
 export default mapSlice.reducer;

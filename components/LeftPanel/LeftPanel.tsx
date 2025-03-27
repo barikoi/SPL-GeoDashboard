@@ -17,7 +17,8 @@ import {
   setIsShowCoveragePercetage,
   toggleSuggestedHubsVisibility,
   toggleWalkingDistanceVisibility,
-  setIsGetSuggestedHubsWalkingDistanceButtonClicked
+  setIsGetSuggestedHubsWalkingDistanceButtonClicked,
+  setIsWalkableCoverageModalVisible
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -34,6 +35,7 @@ import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
 import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
+import CalculateWalkableCoverageModal from "./CalculateWalkableCoverageModal";
 
 // Update the downloadCSV function with proper types
 const downloadCSV = (dataset: {
@@ -79,10 +81,10 @@ const LeftPanel = () => {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
   const isCalculatingCoverage = useSelector((state: RootState) => state.map.isCalculatingCoverage);
-  const suggestedHubsVisible = useSelector((state: RootState) => state.map.suggestedHubsVisible);
   const isShowSuggestedHubsCoverage = useSelector((state: RootState) => state.map.isShowSuggestedHubsCoverage);
   const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
   const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
+  const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
 
   const options: CheckboxGroupProps<string>['options'] = [
     { 
@@ -140,7 +142,7 @@ const LeftPanel = () => {
               dynamicTyping: true,
               complete: (result) => {
                 const headers = result.meta.fields || [];
-                const requiredColumns = ['City', 'Latitude', 'Longitude'];
+                const requiredColumns = ['City', 'Latitude' ,'Longitude'];
                 const missingColumns = requiredColumns.filter(col => 
                   !headers.some(header => header.toLowerCase() === col.toLowerCase())
                 );
@@ -188,7 +190,7 @@ const LeftPanel = () => {
             const jsonData = JSON.parse(content);
             
             const firstItem = jsonData[0];
-            if (!firstItem || !firstItem.City || !firstItem.Latitude || !firstItem.Longitude) {
+            if (!firstItem || !firstItem.City || !firstItem.city || !firstItem.Latitude || !firstItem.latitude || !firstItem.Longitude || !firstItem.longitude) {
               message.error(
                 'JSON file must contain City, Latitude, and Longitude fields'
               );
@@ -439,8 +441,13 @@ const LeftPanel = () => {
       return;
     }
 
+    // Filter datasets based on selected option
+    const filteredDatasets = datasets.filter(dataset => 
+      dataset.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase()
+    );
+
     // Check if either coverage column exists or isochrones are calculated
-    const hasIsochrones = datasets.some((dataset) => dataset.hasIsochrones);
+    const hasIsochrones = filteredDatasets.some((dataset) => dataset.hasIsochrones);
     if (!hasCoverageColumn && !hasIsochrones) {
       message.error("Please calculate walkable coverage first.");
       return;
@@ -451,7 +458,7 @@ const LeftPanel = () => {
 
     try {
       // Get the dataset with coverage (either from file or calculated)
-      const dataset = hasCoverageColumn ? datasets[0] : datasets.find((d) => d.hasIsochrones);
+      const dataset = hasCoverageColumn ? filteredDatasets[0] : filteredDatasets.find((d) => d.hasIsochrones);
       if (!dataset) {
         throw new Error("No dataset with coverage found");
       }
@@ -568,7 +575,6 @@ const LeftPanel = () => {
   };
 
   const handleGetSuggestedHubsWalkingDistance = () => {
-    console.log("yes")
     dispatch(setIsGetSuggestedHubsWalkingDistanceButtonClicked())
   }
 
@@ -870,7 +876,7 @@ const LeftPanel = () => {
               isNightMode ? "text-gray-200" : "text-gray-700"
             }`}
           >
-            Calculate Walkable Coverage
+            Calculate Walkable Coverage <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span>
           </h2>
 
           {/* Walking time input and calculate button */}
@@ -919,13 +925,7 @@ const LeftPanel = () => {
           <div className="flex space-x-2">
             <button
               onClick={() => {
-                dispatch(showIsochrones(true));
-                
-                // Dispatch a custom event to trigger coverage calculation in MapComponent
-                const event = new CustomEvent("calculateCoverage", {
-                  detail: { triggered: true }
-                });
-                window.dispatchEvent(event);
+                dispatch(setIsWalkableCoverageModalVisible(true))
               }}
               disabled={isCalculatingCoverage}
               className={`flex-1 py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center ${
@@ -1044,12 +1044,16 @@ const LeftPanel = () => {
               disabled={
                 isCalculating ||
                 !populationFile ||
-                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
                 !populationFile ||
-                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
                   ? "opacity-50 cursor-not-allowed"
                   : ""
               }`}
@@ -1062,7 +1066,9 @@ const LeftPanel = () => {
               ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
                 "Upload Hub Locations"
               ) : !hasCoverageColumn && //NOSONAR
-                !datasets.some((d) => d.hasIsochrones) ? (
+                !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones) ? (
                 "Calculate Walkable Coverage"
               ) : !populationFile ? ( //NOSONAR
                 "Upload Population File"
@@ -1200,6 +1206,8 @@ const LeftPanel = () => {
           )}
         </div>
       }
+
+      <CalculateWalkableCoverageModal />
     </div>
   );
 };
