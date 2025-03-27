@@ -42,7 +42,7 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
   onClose
 }) => {
   const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
-  
+
   if (!showCoverageStats) return null;
 
   // Sort the stats by time limit
@@ -58,7 +58,8 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
   return (
     <div className="absolute right-10 top-[153px] bg-white/90 p-4 rounded-lg shadow-lg z-[1000] max-h-[60vh] overflow-auto">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-bold text-lg">Coverage Statistics <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span></h3>
+        <h3 className="font-bold text-lg">Coverage Statistics</h3> 
+        {/* <h3 className="font-bold text-lg">Coverage Statistics <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span></h3> */}
         <button 
           onClick={onClose}
           className="text-gray-500 hover:text-gray-700 ml-2"
@@ -71,7 +72,7 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
       {sortedStats.length > 0 && (
         <>
           <h4 className="font-semibold text-md mb-2">Current Hub Coverage</h4>
-          <table className="w-[500px] text-sm border mb-4">
+          <table className="w-[600px] text-sm border mb-4">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2 px-3 border-r">Region</th>
@@ -106,7 +107,7 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
       {sortedSuggestedStats.length > 0 && suggestedHubs && suggestedHubs.length > 0 && (
         <>
           <h4 className="font-semibold text-md mb-2">Suggested Hub Coverage</h4>
-          <table className="w-[500px] text-sm border mb-4">
+          <table className="w-[600px] text-sm border mb-4">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2 px-3 border-r">Region</th>
@@ -144,7 +145,7 @@ const CoverageStats: React.FC<CoverageStatsProps> = ({
       {isochroneStats.length > 0 && suggestedHubsIsochrones && suggestedHubsIsochrones.length > 0 && (
         <>
           <h4 className="font-semibold text-md mb-2">Coverage with Walking Distance</h4>
-          <table className="w-[500px] text-sm border mb-4">
+          <table className="w-[600px] text-sm border mb-4">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2 px-3 border-r">Region</th>

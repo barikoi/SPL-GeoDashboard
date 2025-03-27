@@ -791,7 +791,6 @@ function MapComponent() {
     if (!suggestedHubs || suggestedHubs.length === 0 || isFetchingIsochrones) {
       return;
     }
-    console.log({isGetSuggestedHubsWalkingDistanceButtonClicked})
     
     // Fetch fresh isochrones for each suggested hub
     const fetchFreshIsochrones = async () => {
@@ -951,7 +950,6 @@ function MapComponent() {
       }
 
       if(selectedOptionForWalkableCoverage === "parcelat"){
-        console.log({selectedOptionForWalkableCoverage})
         datasets
           .filter(dataset => dataset.uploaded_file_for === "parcelat")
           .forEach(dataset => {
@@ -1032,7 +1030,6 @@ function MapComponent() {
       }
 
       if(selectedOptionForWalkableCoverage === "competitor"){
-        console.log({selectedOptionForWalkableCoverage, datasets})
         datasets
           .filter(dataset => dataset.uploaded_file_for === "competitor")
           .forEach(dataset => {
@@ -1112,8 +1109,6 @@ function MapComponent() {
         });
       }
 
-      console.log({regionCoverage})
-
       // Calculate percentages for each region
       Object.entries(regionCoverage).forEach(([regionName, region]) => {
         if (region.totalArea > 0) {
@@ -1127,7 +1122,7 @@ function MapComponent() {
       // Step 4: Update the stats with the total coverage and Riyadh only
       // Create a new stat entry with the current time limit
       const newStat = {
-        provinceName: "Riyadh",
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
         totalArea: regionCoverage["Riyadh"]?.totalArea || 0,
         coveredArea: regionCoverage["Riyadh"]?.coveredArea || 0,
         coveragePercentage: regionCoverage["Riyadh"]?.coveragePercentage || 0,
@@ -1201,7 +1196,7 @@ function MapComponent() {
       
       // Create a new stat entry with the current timestamp
       const newStat = {
-        provinceName: "Riyadh",
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
         totalArea: riyadhArea,
         coveredArea: totalCoveredArea,
         coveragePercentage: coveragePercentage,
@@ -1223,12 +1218,11 @@ function MapComponent() {
       console.error("Error calculating suggested hub stats:", error);
       message.error("Failed to calculate suggested hub coverage statistics");
     }
-  }, [suggestedHubs]);
+  }, [suggestedHubs, selectedOptionForWalkableCoverage]);
 
   // Update the calculateSuggestedHubsIsochronesStats function to preserve previous data
   const calculateSuggestedHubsIsochronesStats = useCallback(async (hubs) => {
     if (!hubs || hubs.length === 0) return;
-    
     try {
       let totalCoveredArea = 0;
       
@@ -1277,7 +1271,7 @@ function MapComponent() {
       
       // Create a new stat entry with the current timestamp
       const newStat = {
-        provinceName: "Riyadh",
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
         totalArea: riyadhArea,
         coveredArea: totalCoveredArea,
         coveragePercentage: coveragePercentage,
@@ -1300,7 +1294,7 @@ function MapComponent() {
       console.error("Error calculating suggested hubs isochrones stats:", error);
       message.error("Failed to calculate suggested hubs isochrones coverage statistics");
     }
-  }, []);
+  }, [selectedOptionForWalkableCoverage]);
 
   // Combine both calculations in one function
   const handleCalculateCoverage = useCallback(() => {

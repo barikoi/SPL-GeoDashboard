@@ -586,8 +586,6 @@ const LeftPanel = () => {
   // Change this condition
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
-  console.log({isShowWalkingDistanceVisibility})
-
   return (
     <div
       className={`w-full md:w-[22vw] h-[50vh] md:h-screen p-3 md:p-4 z-10 shadow-xl overflow-y-auto ${

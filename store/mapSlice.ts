@@ -185,7 +185,6 @@ const mapSlice = createSlice({
     },
     setSelectedOptionForWalkableCoverage: (state, action) => {
       state.selectedOptionForWalkableCoverage = action.payload; 
-      console.log(state.selectedOptionForWalkableCoverage, "state.selectedOptionForWalkableCoverage")
     }
   },
 });
