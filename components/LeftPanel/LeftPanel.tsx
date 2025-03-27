@@ -63,7 +63,9 @@ const LeftPanel = () => {
   const dispatch = useDispatch();
 
   // Local States
-  const [fileUploaded, setFileUploaded] = useState(false);
+  // const [fileUploaded, setFileUploaded] = useState(false);
+  const [fileUploadedForParcelat, setFileUploadedForParcelat] = useState(false);
+  const [fileUploadedForCompetitor, setFileUploadedForCompetitor] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [populationFile, setPopulationFile] = useState<File | null>(null);
@@ -105,7 +107,136 @@ const LeftPanel = () => {
   };
 
   // Hub Locations uploaded file
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChangeForParcelat = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files.length > 1) {
+      alert('Please select only one file.');
+      e.target.value = '';
+      return;
+    }
+
+    const file = e.target.files[0];
+    
+    // Check if the file has already been uploaded
+    const isFileAlreadyUploaded = datasets.some(dataset => dataset.name === file.name);
+    if (isFileAlreadyUploaded) {
+      message.error("This file has already been uploaded. Please upload a different file.");
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        const content = e.target.result as string;
+        const id = `dataset-${Date.now()}`;
+        const color = getRandomColor();
+        const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [ number, number, number ];
+
+        try {
+          if (file.name.endsWith(".csv")) {
+            Papa.parse(content, {
+              header: true,
+              dynamicTyping: true,
+              complete: (result) => {
+                const headers = result.meta.fields || [];
+                const requiredColumns = ['City', 'Latitude', 'Longitude'];
+                const missingColumns = requiredColumns.filter(col => 
+                  !headers.some(header => header.toLowerCase() === col.toLowerCase())
+                );
+
+                if (missingColumns.length > 0) {
+                  message.error(
+                    `Missing required columns: ${missingColumns.join(', ')}. ` +
+                    'Please ensure your file contains City, Latitude, and Longitude columns.'
+                  );
+                  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                  if (fileInput) fileInput.value = '';
+                  return;
+                }
+
+                const hasCoverage = checkForCoverageColumn(result.data);
+                setHasCoverageColumn(hasCoverage);
+                
+                const normalizedData = normalizeData(result.data, "csv");
+                dispatch(
+                  addDataset({
+                    id,
+                    name: file.name,
+                    data: normalizedData,
+                    visible: true,
+                    color,
+                    strokedColor,
+                    originalFile: result.data,
+                    layerIds: {
+                      coverage: `coverage-layer-${id}`,
+                      scatterplot: `scatterplot-layer-${id}`
+                    },
+                    uploaded_file_for: "parcelat"
+                  })
+                );
+                setFileUploadedForParcelat(true);
+              },
+              error: (error) => {
+                console.error("Error parsing CSV file:", error);
+                message.error("Failed to parse CSV file");
+                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+              }
+            });
+          } else if (file.name.endsWith(".json")) {
+            const jsonData = JSON.parse(content);
+            
+            const firstItem = jsonData[0];
+            if (!firstItem || !firstItem.City || !firstItem.Latitude || !firstItem.Longitude) {
+              message.error(
+                'JSON file must contain City, Latitude, and Longitude fields'
+              );
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = '';
+              return;
+            }
+
+            setHasCoverageColumn(false);
+            const normalizedData = normalizeData(jsonData, "json");
+            dispatch(
+              addDataset({
+                id,
+                name: file.name,
+                data: normalizedData,
+                visible: true,
+                color,
+                strokedColor,
+                originalFile: jsonData,
+                layerIds: {
+                  coverage: `coverage-layer-${id}`,
+                  scatterplot: `scatterplot-layer-${id}`
+                },
+                uploaded_file_for: "parcelat"
+              })
+            );
+            setFileUploadedForParcelat(true);
+          }
+        } catch (error) {
+          console.error("Error parsing file:", error);
+          message.error("Failed to parse file");
+          const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
+        }
+      }
+    };
+
+    reader.onerror = () => {
+      console.error("Error reading file");
+      message.error("Failed to read file");
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    };
+
+    reader.readAsText(file);
+  }; 
+  
+  const handleFileChangeForCompetitor = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !files[0]) {
       e.target.value = '';
@@ -169,10 +300,11 @@ const LeftPanel = () => {
                     layerIds: {
                       coverage: `coverage-layer-${id}`,
                       scatterplot: `scatterplot-layer-${id}`
-                    }
+                    },
+                    uploaded_file_for: "competitor"
                   })
                 );
-                setFileUploaded(true);
+                setFileUploadedForCompetitor(true);
               },
               error: (error) => {
                 console.error("Error parsing CSV file:", error);
@@ -208,10 +340,11 @@ const LeftPanel = () => {
                 layerIds: {
                   coverage: `coverage-layer-${id}`,
                   scatterplot: `scatterplot-layer-${id}`
-                }
+                },
+                uploaded_file_for: "competitor"
               })
             );
-            setFileUploaded(true);
+            setFileUploadedForCompetitor(true);
           }
         } catch (error) {
           console.error("Error parsing file:", error);
@@ -237,7 +370,8 @@ const LeftPanel = () => {
     // Check if there are any remaining datasets
     const remainingDatasets = datasets.filter((d) => d.id !== id);
     if (remainingDatasets.length === 0) {
-      setFileUploaded(false);
+      setFileUploadedForParcelat(false);
+      setFileUploadedForCompetitor(false);
       setPopulationFile(null);
     }
   };
@@ -314,8 +448,6 @@ const LeftPanel = () => {
 
     setIsCalculating(true);
     setUploadProgress(0);
-
-    console.log({datasets})
 
     try {
       // Get the dataset with coverage (either from file or calculated)
@@ -506,16 +638,24 @@ const LeftPanel = () => {
         }`}
       >
         <h2
-          className={`text-xs md:text-sm font-semibold mb-2 ${
+          className={`text-xs md:text-sm font-bold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
           }`}
         >
           Upload Hub Locations
         </h2>
+        {/* For Parcelat Points */}
+        <h3
+          className={`text-xs md:text-sm font-semibold mb-2 ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}
+        >
+          Parcelat Points
+        </h3>
         <input
           type="file"
           accept=".json,.csv"
-          onChange={handleFileChange}
+          onChange={handleFileChangeForParcelat}
           className={`w-full p-1.5 border-2 border-dashed rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs ${
             isNightMode
               ? "bg-gray-600 border-gray-500 text-gray-100"
@@ -524,7 +664,7 @@ const LeftPanel = () => {
         />
 
         {/* Dataset list with download options */}
-        {fileUploaded && (
+        {fileUploadedForParcelat && (
           <div className="mb-3">
             <h3
               className={`text-xs font-medium mb-1.5 ${
@@ -533,7 +673,115 @@ const LeftPanel = () => {
             >
               Uploaded Datasets:
             </h3>
-            {datasets.map((dataset) => (
+            {datasets
+              .filter(dataset => dataset.uploaded_file_for === "parcelat")
+              .map((dataset) => (
+                <div
+                  key={dataset.id}
+                  className={`flex items-center justify-between mb-1.5 p-1.5 rounded-lg ${
+                    isNightMode ? "bg-gray-600" : "bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <button
+                      onClick={() =>
+                        dispatch(toggleDatasetVisibility(dataset.id))
+                      }
+                      className={`mr-2 ${
+                        isNightMode ? "text-gray-300" : "text-gray-500"
+                      } hover:text-blue-500 transition-colors`}
+                    >
+                      {dataset.visible ? (
+                        <FaEye size={14} />
+                      ) : (
+                        <FaEyeSlash size={14} />
+                      )}
+                    </button>
+                    <div
+                      className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                      style={{
+                        backgroundColor: `rgb(${dataset.color.join(",")})`,
+                      }}
+                    />
+                    <span
+                      className={`text-xs font-medium ${
+                        isNightMode ? "text-gray-200" : "text-gray-700"
+                      }`}
+                    >
+                      {dataset.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Tooltip title="Delete Dataset">
+                      <button
+                        onClick={() => handleDeleteDataset(dataset.id)}
+                        className={`${
+                          isNightMode ? "text-gray-300" : "text-gray-500"
+                        } hover:text-red-500 transition-colors`}
+                      >
+                        <FaTrash size={14} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip
+                      title={
+                        dataset.hasIsochrones
+                          ? "Download Dataset with Coverage"
+                          : "Calculate coverage first"
+                      }
+                    >
+                      <button
+                        onClick={() => downloadCSV(dataset)}
+                        className={`${
+                          isNightMode ? "text-gray-300" : "text-gray-500"
+                        } transition-colors ${
+                          dataset.hasIsochrones
+                            ? "hover:text-blue-500"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
+                        disabled={!dataset.hasIsochrones}
+                      >
+                        <FaDownload size={14} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* For Competitor Points */}
+        <h3
+          className={`text-xs md:text-sm font-semibold mb-2 ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}
+        >
+          Competitor Points
+        </h3>
+        <input
+          type="file"
+          accept=".json,.csv"
+          onChange={handleFileChangeForCompetitor}
+          className={`w-full p-1.5 border-2 border-dashed rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs ${
+            isNightMode
+              ? "bg-gray-600 border-gray-500 text-gray-100"
+              : "bg-white border-gray-300 text-gray-800"
+          }`}
+        />
+
+        {/* Dataset list with download options */}
+        {fileUploadedForCompetitor && (
+          <div className="mb-3">
+            <h3
+              className={`text-xs font-medium mb-1.5 ${
+                isNightMode ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              Uploaded Datasets:
+            </h3>
+            {datasets
+              .filter(dataset => dataset.uploaded_file_for === "competitor")
+              .map((dataset) => (
               <div
                 key={dataset.id}
                 className={`flex items-center justify-between mb-1.5 p-1.5 rounded-lg ${
@@ -603,13 +851,15 @@ const LeftPanel = () => {
                   </Tooltip>
                 </div>
               </div>
-            ))}
+              ))
+            }
           </div>
         )}
+
       </div>
 
       {/* Step 2: More compact dataset list and controls */}
-      {fileUploaded && !hasCoverageColumn && (
+      {(fileUploadedForParcelat || fileUploadedForCompetitor) && !hasCoverageColumn && (
         <div
           className={`mb-4 p-3 rounded-lg shadow-sm ${
             isNightMode ? "bg-gray-700" : "bg-white"
@@ -809,7 +1059,7 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : !fileUploaded ? ( //NOSONAR
+              ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
                 "Upload Hub Locations"
               ) : !hasCoverageColumn && //NOSONAR
                 !datasets.some((d) => d.hasIsochrones) ? (
