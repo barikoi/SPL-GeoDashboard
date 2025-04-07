@@ -13,7 +13,12 @@ import {
   togglePopulationLayer,
   toggleNightMode,
   setDeckglLayer,
-  toggleBuildingShow
+  toggleBuildingShow,
+  setIsShowCoveragePercetage,
+  toggleSuggestedHubsVisibility,
+  toggleWalkingDistanceVisibility,
+  setIsGetSuggestedHubsWalkingDistanceButtonClicked,
+  setIsWalkableCoverageModalVisible
 } from "@/store/mapSlice";
 import { RootState } from "@/store/store";
 import {
@@ -26,10 +31,11 @@ import {
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "../../app/images/SPL_Logo.webp";
-import { Progress, message, Spin, Tooltip, Switch, Radio } from "antd";
+import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
 import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
+import CalculateWalkableCoverageModal from "./CalculateWalkableCoverageModal";
 
 // Update the downloadCSV function with proper types
 const downloadCSV = (dataset: {
@@ -59,7 +65,9 @@ const LeftPanel = () => {
   const dispatch = useDispatch();
 
   // Local States
-  const [fileUploaded, setFileUploaded] = useState(false);
+  // const [fileUploaded, setFileUploaded] = useState(false);
+  const [fileUploadedForParcelat, setFileUploadedForParcelat] = useState(false);
+  const [fileUploadedForCompetitor, setFileUploadedForCompetitor] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [populationFile, setPopulationFile] = useState<File | null>(null);
@@ -73,6 +81,10 @@ const LeftPanel = () => {
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
   const isCalculatingCoverage = useSelector((state: RootState) => state.map.isCalculatingCoverage);
+  const isShowSuggestedHubsCoverage = useSelector((state: RootState) => state.map.isShowSuggestedHubsCoverage);
+  const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
+  const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
+  const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
 
   const options: CheckboxGroupProps<string>['options'] = [
     { 
@@ -97,17 +109,25 @@ const LeftPanel = () => {
   };
 
   // Hub Locations uploaded file
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || !files[0]) {
-      setFileUploaded(false);
+  const handleFileChangeForParcelat = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files.length > 1) {
+      alert('Please select only one file.');
+      e.target.value = '';
       return;
     }
 
-    setFileUploaded(true);
-    const file = files[0];
+    const file = e.target.files[0];
+    
+    // Check if the file has already been uploaded
+    const isFileAlreadyUploaded = datasets.some(dataset => dataset.name === file.name);
+    if (isFileAlreadyUploaded) {
+      message.error("This file has already been uploaded. Please upload a different file.");
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
+
     reader.onload = async (e: ProgressEvent<FileReader>) => {
       if (e.target?.result) {
         const content = e.target.result as string;
@@ -115,46 +135,235 @@ const LeftPanel = () => {
         const color = getRandomColor();
         const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [ number, number, number ];
 
-        if (file.name.endsWith(".csv")) {
-          Papa.parse(content, {
-            header: true,
-            dynamicTyping: true,
-            complete: (result) => {
-              // result output : data, errors and meta
-              const hasCoverage = checkForCoverageColumn(result.data);
-              setHasCoverageColumn(hasCoverage);
-              const normalizedData = normalizeData(result.data, "csv");
-              dispatch(
-                addDataset({
-                  id,
-                  name: file.name,
-                  data: normalizedData,
-                  visible: true,
-                  color,
-                  strokedColor,
-                  originalFile: result.data,
-                })
+        try {
+          if (file.name.endsWith(".csv")) {
+            Papa.parse(content, {
+              header: true,
+              dynamicTyping: true,
+              complete: (result) => {
+                const headers = result.meta.fields || [];
+                const requiredColumns = ['City', 'Latitude' ,'Longitude'];
+                const missingColumns = requiredColumns.filter(col => 
+                  !headers.some(header => header.toLowerCase() === col.toLowerCase())
+                );
+
+                if (missingColumns.length > 0) {
+                  message.error(
+                    `Missing required columns: ${missingColumns.join(', ')}. ` +
+                    'Please ensure your file contains City, Latitude, and Longitude columns.'
+                  );
+                  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                  if (fileInput) fileInput.value = '';
+                  return;
+                }
+
+                const hasCoverage = checkForCoverageColumn(result.data);
+                setHasCoverageColumn(hasCoverage);
+                
+                const normalizedData = normalizeData(result.data, "csv");
+                dispatch(
+                  addDataset({
+                    id,
+                    name: file.name,
+                    data: normalizedData,
+                    visible: true,
+                    color,
+                    strokedColor,
+                    originalFile: result.data,
+                    layerIds: {
+                      coverage: `coverage-layer-${id}`,
+                      scatterplot: `scatterplot-layer-${id}`
+                    },
+                    uploaded_file_for: "parcelat"
+                  })
+                );
+                setFileUploadedForParcelat(true);
+              },
+              error: (error) => {
+                console.error("Error parsing CSV file:", error);
+                message.error("Failed to parse CSV file");
+                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+              }
+            });
+          } else if (file.name.endsWith(".json")) {
+            const jsonData = JSON.parse(content);
+            
+            const firstItem = jsonData[0];
+            if (!firstItem || !firstItem.City || !firstItem.city || !firstItem.Latitude || !firstItem.latitude || !firstItem.Longitude || !firstItem.longitude) {
+              message.error(
+                'JSON file must contain City, Latitude, and Longitude fields'
               );
-            },
-          });
-        } else if (file.name.endsWith(".json")) {
-          const jsonData = JSON.parse(content);
-          setHasCoverageColumn(false);
-          const normalizedData = normalizeData(jsonData, "json");
-          dispatch(
-            addDataset({
-              id,
-              name: file.name,
-              data: normalizedData,
-              visible: true,
-              color,
-              strokedColor,
-              originalFile: jsonData,
-            })
-          );
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = '';
+              return;
+            }
+
+            setHasCoverageColumn(false);
+            const normalizedData = normalizeData(jsonData, "json");
+            dispatch(
+              addDataset({
+                id,
+                name: file.name,
+                data: normalizedData,
+                visible: true,
+                color,
+                strokedColor,
+                originalFile: jsonData,
+                layerIds: {
+                  coverage: `coverage-layer-${id}`,
+                  scatterplot: `scatterplot-layer-${id}`
+                },
+                uploaded_file_for: "parcelat"
+              })
+            );
+            setFileUploadedForParcelat(true);
+          }
+        } catch (error) {
+          console.error("Error parsing file:", error);
+          message.error("Failed to parse file");
+          const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
         }
       }
     };
+
+    reader.onerror = () => {
+      console.error("Error reading file");
+      message.error("Failed to read file");
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    };
+
+    reader.readAsText(file);
+  }; 
+  
+  const handleFileChangeForCompetitor = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || !files[0]) {
+      e.target.value = '';
+      return;
+    }
+
+    const file = files[0];
+    
+    // Check if the file has already been uploaded
+    const isFileAlreadyUploaded = datasets.some(dataset => dataset.name === file.name);
+    if (isFileAlreadyUploaded) {
+      message.error("This file has already been uploaded. Please upload a different file.");
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        const content = e.target.result as string;
+        const id = `dataset-${Date.now()}`;
+        const color = getRandomColor();
+        const strokedColor = color.map((c) => Math.floor(c * 0.6)) as [ number, number, number ];
+
+        try {
+          if (file.name.endsWith(".csv")) {
+            Papa.parse(content, {
+              header: true,
+              dynamicTyping: true,
+              complete: (result) => {
+                const headers = result.meta.fields || [];
+                const requiredColumns = ['City', 'Latitude', 'Longitude'];
+                const missingColumns = requiredColumns.filter(col => 
+                  !headers.some(header => header.toLowerCase() === col.toLowerCase())
+                );
+
+                if (missingColumns.length > 0) {
+                  message.error(
+                    `Missing required columns: ${missingColumns.join(', ')}. ` +
+                    'Please ensure your file contains City, Latitude, and Longitude columns.'
+                  );
+                  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                  if (fileInput) fileInput.value = '';
+                  return;
+                }
+
+                const hasCoverage = checkForCoverageColumn(result.data);
+                setHasCoverageColumn(hasCoverage);
+                
+                const normalizedData = normalizeData(result.data, "csv");
+                dispatch(
+                  addDataset({
+                    id,
+                    name: file.name,
+                    data: normalizedData,
+                    visible: true,
+                    color,
+                    strokedColor,
+                    originalFile: result.data,
+                    layerIds: {
+                      coverage: `coverage-layer-${id}`,
+                      scatterplot: `scatterplot-layer-${id}`
+                    },
+                    uploaded_file_for: "competitor"
+                  })
+                );
+                setFileUploadedForCompetitor(true);
+              },
+              error: (error) => {
+                console.error("Error parsing CSV file:", error);
+                message.error("Failed to parse CSV file");
+                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+              }
+            });
+          } else if (file.name.endsWith(".json")) {
+            const jsonData = JSON.parse(content);
+            
+            const firstItem = jsonData[0];
+            if (!firstItem || !firstItem.City || !firstItem.Latitude || !firstItem.Longitude) {
+              message.error(
+                'JSON file must contain City, Latitude, and Longitude fields'
+              );
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = '';
+              return;
+            }
+
+            setHasCoverageColumn(false);
+            const normalizedData = normalizeData(jsonData, "json");
+            dispatch(
+              addDataset({
+                id,
+                name: file.name,
+                data: normalizedData,
+                visible: true,
+                color,
+                strokedColor,
+                originalFile: jsonData,
+                layerIds: {
+                  coverage: `coverage-layer-${id}`,
+                  scatterplot: `scatterplot-layer-${id}`
+                },
+                uploaded_file_for: "competitor"
+              })
+            );
+            setFileUploadedForCompetitor(true);
+          }
+        } catch (error) {
+          console.error("Error parsing file:", error);
+          message.error("Failed to parse file");
+          const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
+        }
+      }
+    };
+
+    reader.onerror = () => {
+      console.error("Error reading file");
+      message.error("Failed to read file");
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    };
+
     reader.readAsText(file);
   };
 
@@ -163,7 +372,8 @@ const LeftPanel = () => {
     // Check if there are any remaining datasets
     const remainingDatasets = datasets.filter((d) => d.id !== id);
     if (remainingDatasets.length === 0) {
-      setFileUploaded(false);
+      setFileUploadedForParcelat(false);
+      setFileUploadedForCompetitor(false);
       setPopulationFile(null);
     }
   };
@@ -183,11 +393,25 @@ const LeftPanel = () => {
         Papa.parse(e.target.result as string, {
           header: true,
           complete: (results) => {
+            // Validate required columns
+            const headers = results.meta.fields || [];
+            const requiredColumns = ['Latitude', 'Longitude'];
+            const missingColumns = requiredColumns.filter(col => 
+              !headers.some(header => header.toLowerCase() === col.toLowerCase())
+            );
+
+            if (missingColumns.length > 0) {
+              message.error(
+                `Missing required columns: ${missingColumns.join(', ')}. ` +
+                'Please ensure your population file contains Latitude and Longitude columns.'
+              );
+              return;
+            }
+
             // Validate data structure
             const sampleRow = results.data[0];
-
             if (!sampleRow?.Latitude || !sampleRow?.Longitude) {
-              message.error("File must contain Latitude and Longitude columns");
+              message.error("File must contain valid Latitude and Longitude columns");
               return;
             }
 
@@ -217,8 +441,13 @@ const LeftPanel = () => {
       return;
     }
 
+    // Filter datasets based on selected option
+    const filteredDatasets = datasets.filter(dataset => 
+      dataset.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase()
+    );
+
     // Check if either coverage column exists or isochrones are calculated
-    const hasIsochrones = datasets.some((dataset) => dataset.hasIsochrones);
+    const hasIsochrones = filteredDatasets.some((dataset) => dataset.hasIsochrones);
     if (!hasCoverageColumn && !hasIsochrones) {
       message.error("Please calculate walkable coverage first.");
       return;
@@ -227,11 +456,9 @@ const LeftPanel = () => {
     setIsCalculating(true);
     setUploadProgress(0);
 
-    console.log({datasets})
-
     try {
       // Get the dataset with coverage (either from file or calculated)
-      const dataset = hasCoverageColumn ? datasets[0] : datasets.find((d) => d.hasIsochrones);
+      const dataset = hasCoverageColumn ? filteredDatasets[0] : filteredDatasets.find((d) => d.hasIsochrones);
       if (!dataset) {
         throw new Error("No dataset with coverage found");
       }
@@ -347,6 +574,10 @@ const LeftPanel = () => {
     }
   };
 
+  const handleGetSuggestedHubsWalkingDistance = () => {
+    dispatch(setIsGetSuggestedHubsWalkingDistanceButtonClicked())
+  }
+
   const onLayerChange = (e:any) => {
     const layer = e.target.value
     dispatch(setDeckglLayer(layer))
@@ -411,16 +642,24 @@ const LeftPanel = () => {
         }`}
       >
         <h2
-          className={`text-xs md:text-sm font-semibold mb-2 ${
+          className={`text-xs md:text-sm font-bold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
           }`}
         >
           Upload Hub Locations
         </h2>
+        {/* For Parcelat Points */}
+        <h3
+          className={`text-xs md:text-sm font-semibold mb-2 ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}
+        >
+          Parcelat Points
+        </h3>
         <input
           type="file"
           accept=".json,.csv"
-          onChange={handleFileChange}
+          onChange={handleFileChangeForParcelat}
           className={`w-full p-1.5 border-2 border-dashed rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs ${
             isNightMode
               ? "bg-gray-600 border-gray-500 text-gray-100"
@@ -429,7 +668,7 @@ const LeftPanel = () => {
         />
 
         {/* Dataset list with download options */}
-        {fileUploaded && (
+        {fileUploadedForParcelat && (
           <div className="mb-3">
             <h3
               className={`text-xs font-medium mb-1.5 ${
@@ -438,7 +677,115 @@ const LeftPanel = () => {
             >
               Uploaded Datasets:
             </h3>
-            {datasets.map((dataset) => (
+            {datasets
+              .filter(dataset => dataset.uploaded_file_for === "parcelat")
+              .map((dataset) => (
+                <div
+                  key={dataset.id}
+                  className={`flex items-center justify-between mb-1.5 p-1.5 rounded-lg ${
+                    isNightMode ? "bg-gray-600" : "bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <button
+                      onClick={() =>
+                        dispatch(toggleDatasetVisibility(dataset.id))
+                      }
+                      className={`mr-2 ${
+                        isNightMode ? "text-gray-300" : "text-gray-500"
+                      } hover:text-blue-500 transition-colors`}
+                    >
+                      {dataset.visible ? (
+                        <FaEye size={14} />
+                      ) : (
+                        <FaEyeSlash size={14} />
+                      )}
+                    </button>
+                    <div
+                      className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                      style={{
+                        backgroundColor: `rgb(${dataset.color.join(",")})`,
+                      }}
+                    />
+                    <span
+                      className={`text-xs font-medium ${
+                        isNightMode ? "text-gray-200" : "text-gray-700"
+                      }`}
+                    >
+                      {dataset.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Tooltip title="Delete Dataset">
+                      <button
+                        onClick={() => handleDeleteDataset(dataset.id)}
+                        className={`${
+                          isNightMode ? "text-gray-300" : "text-gray-500"
+                        } hover:text-red-500 transition-colors`}
+                      >
+                        <FaTrash size={14} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip
+                      title={
+                        dataset.hasIsochrones
+                          ? "Download Dataset with Coverage"
+                          : "Calculate coverage first"
+                      }
+                    >
+                      <button
+                        onClick={() => downloadCSV(dataset)}
+                        className={`${
+                          isNightMode ? "text-gray-300" : "text-gray-500"
+                        } transition-colors ${
+                          dataset.hasIsochrones
+                            ? "hover:text-blue-500"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
+                        disabled={!dataset.hasIsochrones}
+                      >
+                        <FaDownload size={14} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {/* For Competitor Points */}
+        <h3
+          className={`text-xs md:text-sm font-semibold mb-2 ${
+            isNightMode ? "text-gray-200" : "text-gray-700"
+          }`}
+        >
+          Competitor Points
+        </h3>
+        <input
+          type="file"
+          accept=".json,.csv"
+          onChange={handleFileChangeForCompetitor}
+          className={`w-full p-1.5 border-2 border-dashed rounded-lg mb-2 hover:border-blue-500 transition-colors cursor-pointer text-xs ${
+            isNightMode
+              ? "bg-gray-600 border-gray-500 text-gray-100"
+              : "bg-white border-gray-300 text-gray-800"
+          }`}
+        />
+
+        {/* Dataset list with download options */}
+        {fileUploadedForCompetitor && (
+          <div className="mb-3">
+            <h3
+              className={`text-xs font-medium mb-1.5 ${
+                isNightMode ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              Uploaded Datasets:
+            </h3>
+            {datasets
+              .filter(dataset => dataset.uploaded_file_for === "competitor")
+              .map((dataset) => (
               <div
                 key={dataset.id}
                 className={`flex items-center justify-between mb-1.5 p-1.5 rounded-lg ${
@@ -508,13 +855,15 @@ const LeftPanel = () => {
                   </Tooltip>
                 </div>
               </div>
-            ))}
+              ))
+            }
           </div>
         )}
+
       </div>
 
       {/* Step 2: More compact dataset list and controls */}
-      {fileUploaded && !hasCoverageColumn && (
+      {(fileUploadedForParcelat || fileUploadedForCompetitor) && !hasCoverageColumn && (
         <div
           className={`mb-4 p-3 rounded-lg shadow-sm ${
             isNightMode ? "bg-gray-700" : "bg-white"
@@ -525,7 +874,7 @@ const LeftPanel = () => {
               isNightMode ? "text-gray-200" : "text-gray-700"
             }`}
           >
-            Calculate Walkable Coverage
+            Calculate Walkable Coverage <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span>
           </h2>
 
           {/* Walking time input and calculate button */}
@@ -547,27 +896,35 @@ const LeftPanel = () => {
                 </span>
               </Tooltip>
             </label>
-            <input
+            <Input
               type="number"
-              value={timeLimit}
-              onChange={(e) => dispatch(setTimeLimit(Number(e.target.value)))}
-              min="1"
-              max="60"
+              value={timeLimit || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  dispatch(setTimeLimit(0));
+                } else {
+                  dispatch(setTimeLimit(Number(value)));
+                }
+              }}
+              min={1}
+              max={60}
               disabled={isCalculatingCoverage}
-              className={`w-full p-1.5 border rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 text-xs ${
-                isNightMode
-                  ? "bg-gray-600 border-gray-500 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-800"
-              } ${
-                isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""
-              }`}
               placeholder="1-60 minutes"
+              className={`${isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""}`}
+              style={{ 
+                backgroundColor: isNightMode ? '#4B5563' : '#FFFFFF',
+                borderColor: isNightMode ? '#6B7280' : '#D1D5DB',
+                color: isNightMode ? '#F9FAFB' : '#1F2937'
+              }}
             />
           </div>
 
           <div className="flex space-x-2">
             <button
-              onClick={() => dispatch(showIsochrones(true))}
+              onClick={() => {
+                dispatch(setIsWalkableCoverageModalVisible(true))
+              }}
               disabled={isCalculatingCoverage}
               className={`flex-1 py-1.5 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-xs font-medium flex items-center justify-center ${
                 isCalculatingCoverage ? "opacity-50 cursor-not-allowed" : ""
@@ -685,12 +1042,16 @@ const LeftPanel = () => {
               disabled={
                 isCalculating ||
                 !populationFile ||
-                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
                 !populationFile ||
-                (!hasCoverageColumn && !datasets.some((d) => d.hasIsochrones))
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
                   ? "opacity-50 cursor-not-allowed"
                   : ""
               }`}
@@ -700,10 +1061,12 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : !fileUploaded ? ( //NOSONAR
+              ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
                 "Upload Hub Locations"
               ) : !hasCoverageColumn && //NOSONAR
-                !datasets.some((d) => d.hasIsochrones) ? (
+                !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones) ? (
                 "Calculate Walkable Coverage"
               ) : !populationFile ? ( //NOSONAR
                 "Upload Population File"
@@ -728,7 +1091,7 @@ const LeftPanel = () => {
       {/* Suggested Hubs Section - more compact */}
       {
         <div
-          className={`p-3 rounded-lg shadow-sm ${
+          className={`mb-4 p-3 rounded-lg shadow-sm ${
             isNightMode ? "bg-gray-700" : "bg-white"
           }`}
         >
@@ -747,18 +1110,102 @@ const LeftPanel = () => {
 
           {suggestedHubsCount !== null && (
             <div
-              className={`mt-2 p-1.5 rounded-lg text-xs text-center ${
-                isNightMode
-                  ? "bg-purple-800 border-purple-700 text-purple-100"
-                  : "bg-purple-50 border-purple-200 text-purple-700"
+              className={`flex items-center justify-between mt-2 mb-2 p-1.5 rounded-lg ${
+                isNightMode ? "bg-gray-600" : "bg-gray-50"
               }`}
             >
-              Found {suggestedHubsCount} suggested hub
-              {suggestedHubsCount !== 1 ? "s" : ""}
+              <div className="flex items-center">
+                <button
+                  onClick={() => dispatch(toggleSuggestedHubsVisibility())}
+                  className={`mr-2 ${
+                    isNightMode ? "text-gray-300" : "text-gray-500"
+                  } hover:text-blue-500 transition-colors`}
+                >
+                  {isShowSuggestedHubsCoverage ? (
+                    <FaEye size={14} />
+                  ) : (
+                    <FaEyeSlash size={14} />
+                  )}
+                </button>
+                <div
+                  className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: isNightMode ?  "rgb(145, 245, 173)" :  "rgb(251, 75, 78, 80)"
+                  }}
+                />
+                <span
+                  className={`text-xs font-medium ${
+                    isNightMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+                >
+                  Found {suggestedHubsCount} suggested hub
+                  {suggestedHubsCount !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
           )}
         </div>
       }
+      {/* Suggested Hubs with Walking Distance Section - more compact */}
+      {
+        <div
+          className={`p-3 rounded-lg shadow-sm ${
+            isNightMode ? "bg-gray-700" : "bg-white"
+          }`}
+        >
+          <button
+            onClick={handleGetSuggestedHubsWalkingDistance}
+            disabled={isFetchingIsochrones}
+            className={`w-full py-1.5 px-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm text-xs font-medium ${
+              isFetchingIsochrones ? "opacity-75 cursor-not-allowed" : ""
+            }`}
+          >
+            <div className="flex items-center justify-center space-x-1.5">
+              <span>Get Suggested Hubs Walking Distance</span>
+              {isFetchingIsochrones && <Spin size="small" />}
+            </div>
+          </button>
+
+          {suggestedHubsCount !== null && (
+            <div
+              className={`flex items-center justify-between mt-2 mb-2 p-1.5 rounded-lg ${
+                isNightMode ? "bg-gray-600" : "bg-gray-50"
+              }`}
+            >
+              <div className="flex items-center">
+                <button
+                  onClick={() => dispatch(toggleWalkingDistanceVisibility())}
+                  className={`mr-2 ${
+                    isNightMode ? "text-gray-300" : "text-gray-500"
+                  } hover:text-blue-500 transition-colors`}
+                >
+                  {isShowWalkingDistanceVisibility ? (
+                    <FaEye size={14} />
+                  ) : (
+                    <FaEyeSlash size={14} />
+                  )}
+                </button>
+                <div
+                  className="w-3 h-3 mr-2 rounded-full shadow-inner"
+                  style={{
+                    backgroundColor: "rgb(255, 140, 0, 120)",
+                  }}
+                />
+                <span
+                  className={`text-xs font-medium ${
+                    isNightMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+                >
+                  Suggested hub
+                  {suggestedHubsCount !== 1 ? "s" : ""} walking distance
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      }
+
+      <CalculateWalkableCoverageModal />
     </div>
   );
 };

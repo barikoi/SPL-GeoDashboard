@@ -36,6 +36,16 @@ interface MapState {
   isCalculatingCoverage: boolean;
   deckglLayer: 'Hexgonlayer' | 'Heatmaplayer',
   isShowBuilding: boolean;
+  isShowRegion: boolean;
+  isShowCoveragePercetage: boolean;
+  suggestedHubsIsochrones: any[];
+  isShowRiyadhCity: boolean;
+  isShowSuggestedHubsCoverage: boolean;
+  isShowWalkingDistanceVisibility: boolean;
+  isGetSuggestedHubsWalkingDistanceButtonClicked: boolean;
+  isFetchingIsochrones: boolean;
+  isWalkableCoverageModalVisible: boolean;
+  selectedOptionForWalkableCoverage: 'parcelat' | 'competitor'
 }
 
 const initialState: MapState = {
@@ -50,6 +60,15 @@ const initialState: MapState = {
   isCalculatingCoverage: false,
   deckglLayer: 'Hexgonlayer',
   isShowBuilding: false,
+  isShowCoveragePercetage: false,
+  suggestedHubsIsochrones: null,
+  isShowRiyadhCity: false,
+  isShowSuggestedHubsCoverage: true,
+  isShowWalkingDistanceVisibility: true,
+  isGetSuggestedHubsWalkingDistanceButtonClicked: false,
+  isFetchingIsochrones: false,
+  isWalkableCoverageModalVisible: false,
+  selectedOptionForWalkableCoverage: 'parcelat'
 };
 
 const mapSlice = createSlice({
@@ -137,6 +156,36 @@ const mapSlice = createSlice({
     toggleBuildingShow: (state) => {
       state.isShowBuilding = !state.isShowBuilding; 
     },
+    toggleRegionShow: (state) => {
+      state.isShowRegion = !state.isShowRegion; 
+    },
+    toggleRiyadhCityShow: (state) => {
+      state.isShowRiyadhCity = !state.isShowRiyadhCity; 
+    },
+    toggleSuggestedHubsVisibility: (state) => {
+      state.isShowSuggestedHubsCoverage = !state.isShowSuggestedHubsCoverage; 
+    },
+    setIsShowCoveragePercetage:  (state, action) => {
+      state.isShowCoveragePercetage = action.payload; 
+    },
+    setSuggestedHubsIsochrones: (state, action) => {
+      state.suggestedHubsIsochrones = action.payload; 
+    }, 
+    setIsGetSuggestedHubsWalkingDistanceButtonClicked: (state) => {
+      state.isGetSuggestedHubsWalkingDistanceButtonClicked = !state.isGetSuggestedHubsWalkingDistanceButtonClicked; 
+    },
+    toggleWalkingDistanceVisibility: (state) => {
+      state.isShowWalkingDistanceVisibility = !state.isShowWalkingDistanceVisibility; 
+    }, 
+    setIsFetchingIsochrones: (state, action) => {
+      state.isFetchingIsochrones = action.payload; 
+    },
+    setIsWalkableCoverageModalVisible: (state, action) => {
+      state.isWalkableCoverageModalVisible = action.payload; 
+    },
+    setSelectedOptionForWalkableCoverage: (state, action) => {
+      state.selectedOptionForWalkableCoverage = action.payload; 
+    }
   },
 });
 
@@ -156,6 +205,16 @@ export const {
   toggleNightMode,
   setCalculatingCoverage,
   setDeckglLayer,
-  toggleBuildingShow
+  toggleBuildingShow,
+  toggleRegionShow,
+  setIsShowCoveragePercetage,
+  setSuggestedHubsIsochrones,
+  toggleRiyadhCityShow,
+  toggleSuggestedHubsVisibility,
+  toggleWalkingDistanceVisibility,
+  setIsGetSuggestedHubsWalkingDistanceButtonClicked,
+  setIsFetchingIsochrones,
+  setIsWalkableCoverageModalVisible,
+  setSelectedOptionForWalkableCoverage
 } = mapSlice.actions;
 export default mapSlice.reducer;
