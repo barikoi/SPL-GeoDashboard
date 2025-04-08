@@ -164,7 +164,7 @@ function MapComponent() {
   useEffect(() => {
     const loadProvinceData = async () => {
       try {
-        const response = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json');
+        const response = await fetch('https://gist.githubusercontent.com/sarikamahboob/1b23e53b410c9904bc805241d085067e/raw/4a55a4d550a4bc45edac3bc957d6582348ec8438/gadm41_SAU_2.json');
         const data = await response.json();
         const mergedPolygons = mergeProvincePolygons(data);
         setProvincePolygons(mergedPolygons);
