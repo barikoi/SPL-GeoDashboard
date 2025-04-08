@@ -39,6 +39,7 @@ import { FaEye, FaEyeSlash, FaCalculator } from "react-icons/fa";
 import { HeatMapOutlined, BorderOutlined } from "@ant-design/icons";
 import * as turf from '@turf/turf';
 import CoverageStats from "./CoverageStats";
+import { BASE_URL } from "@/app.config";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -239,6 +240,7 @@ function MapComponent() {
         try {
           // Filter datasets based on uploaded_file_for and selectedOptionForWalkableCoverage
           const filteredDatasets = datasets.filter(dataset => 
+            // @ts-ignore
             dataset.uploaded_file_for === selectedOptionForWalkableCoverage
           );
           for (const dataset of filteredDatasets) {
@@ -300,7 +302,7 @@ function MapComponent() {
 
                 // Upload processed file with AbortController
                 const uploadResponse = await fetch(
-                  "http://202.72.236.166:8000/upload_hub_locations/",
+                  `${BASE_URL}/upload_hub_locations/`,
                   {
                     method: "POST",
                     body: formData,
@@ -341,6 +343,7 @@ function MapComponent() {
 
       // Cleanup function
       return () => {
+        // @ts-ignore
         clearTimeout(debounceTimeout);
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
@@ -951,6 +954,7 @@ function MapComponent() {
 
       if(selectedOptionForWalkableCoverage === "parcelat"){
         datasets
+        // @ts-ignore
           .filter(dataset => dataset.uploaded_file_for === "parcelat")
           .forEach(dataset => {
           if (dataset.visible) {
@@ -1031,6 +1035,7 @@ function MapComponent() {
 
       if(selectedOptionForWalkableCoverage === "competitor"){
         datasets
+        // @ts-ignore
           .filter(dataset => dataset.uploaded_file_for === "competitor")
           .forEach(dataset => {
           if (dataset.visible) {

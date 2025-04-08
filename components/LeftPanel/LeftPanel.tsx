@@ -36,6 +36,7 @@ import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
 import CalculateWalkableCoverageModal from "./CalculateWalkableCoverageModal";
+import { BASE_URL } from "@/app.config";
 
 // Update the downloadCSV function with proper types
 const downloadCSV = (dataset: {
@@ -478,7 +479,7 @@ const LeftPanel = () => {
 
       // Upload hub locations with coverage
       const hubResponse = await fetch(
-        "http://202.72.236.166:8000/upload_hub_locations/",
+        `${BASE_URL}/upload_hub_locations/`,
         {
           method: "POST",
           body: hubFormData,
@@ -497,7 +498,7 @@ const LeftPanel = () => {
       populationFormData.append("file", populationFile);
 
       const populationResponse = await fetch(
-        "http://202.72.236.166:8000/upload_population/",
+        `${BASE_URL}/upload_population/`,
         {
           method: "POST",
           body: populationFormData,
@@ -513,7 +514,7 @@ const LeftPanel = () => {
 
       // Calculate hubs
       const calculateResponse = await fetch(
-        "http://202.72.236.166:8000/calculate_hubs/?radius=2000",
+        `${BASE_URL}/calculate_hubs/?radius=2000`,
         {
           method: "POST",
           headers: {
@@ -544,7 +545,7 @@ const LeftPanel = () => {
     setIsLoadingSuggestions(true);
     try {
       const response = await fetch(
-        "http://202.72.236.166:8000/suggested_hubs/",
+        `${BASE_URL}/suggested_hubs/`,
         {
           method: "GET",
           headers: {
