@@ -164,7 +164,7 @@ function MapComponent() {
   useEffect(() => {
     const loadProvinceData = async () => {
       try {
-        const response = await fetch('/spl/gadm41_SAU_2.json');
+        const response = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json');
         const data = await response.json();
         const mergedPolygons = mergeProvincePolygons(data);
         setProvincePolygons(mergedPolygons);
@@ -909,7 +909,7 @@ function MapComponent() {
       // First, calculate total area for each region from the GeoJSON data
       try {
         // Assuming you have the GeoJSON data loaded
-        const geoJSONData = await fetch('/spl/riyadh_city.json').then(res => res.json());
+        const geoJSONData = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
         let riyadhRegionName = null;
@@ -1176,7 +1176,7 @@ function MapComponent() {
       let riyadhArea = 0;
       try {
         // Assuming you have the GeoJSON data loaded
-        const geoJSONData = await fetch('/spl/riyadh_city.json').then(res => res.json());
+        const geoJSONData = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
         geoJSONData.features.forEach(feature => {
@@ -1251,7 +1251,7 @@ function MapComponent() {
       let riyadhArea = 0;
       try {
         // Assuming you have the GeoJSON data loaded
-        const geoJSONData = await fetch('/spl/riyadh_city.json').then(res => res.json());
+        const geoJSONData = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
         geoJSONData.features.forEach(feature => {
@@ -1336,7 +1336,7 @@ function MapComponent() {
   useEffect(() => {
     const loadRiyadhCityData = async () => {
       try {
-        const response = await fetch('/spl/riyadh_city.json');
+        const response = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json');
         const data = await response.json();
         setRiyadhCityData(data);
       } catch (error) {
