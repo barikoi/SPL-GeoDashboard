@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "export",
+  basePath: '/spl',
+  assetPrefix: '/spl/',
+  trailingSlash: true,
   images: {
     unoptimized: true,
   },
