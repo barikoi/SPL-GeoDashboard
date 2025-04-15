@@ -68,32 +68,32 @@ jobs:
             docker compose pull
             docker compose up -d
 
-      - name: Succeeded
-        uses: rjstone/discord-webhook-notify@v1
-        if: success()
-        with:
-          severity: info
-          username: SPL GeoDashboard
-          details: Deployment Succeeded ✅!
-          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+      # - name: Succeeded
+      #   uses: rjstone/discord-webhook-notify@v1
+      #   if: success()
+      #   with:
+      #     severity: info
+      #     username: SPL GeoDashboard
+      #     details: Deployment Succeeded ✅!
+      #     webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
 
-      - name: Failed
-        uses: rjstone/discord-webhook-notify@v1
-        if: failure()
-        with:
-          severity: error
-          username: SPL GeoDashboard
-          details: Deployment Failed ❌!
-          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+      # - name: Failed
+      #   uses: rjstone/discord-webhook-notify@v1
+      #   if: failure()
+      #   with:
+      #     severity: error
+      #     username: SPL GeoDashboard
+      #     details: Deployment Failed ❌!
+      #     webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
 
-      - name: Cancelled
-        uses: rjstone/discord-webhook-notify@v1
-        if: cancelled()
-        with:
-          severity: warn
-          username: SPL GeoDashboard
-          details: Deployment Cancelled ⚠️!
-          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+      # - name: Cancelled
+      #   uses: rjstone/discord-webhook-notify@v1
+      #   if: cancelled()
+      #   with:
+      #     severity: warn
+      #     username: SPL GeoDashboard
+      #     details: Deployment Cancelled ⚠️!
+      #     webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
 
 
 
