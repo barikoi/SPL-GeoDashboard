@@ -1,0 +1,42 @@
+[
+ {
+  "Description": "Generic API Key",
+  "StartLine": 10,
+  "EndLine": 11,
+  "StartColumn": 32,
+  "EndColumn": 1,
+  "Match": "API_KEY=bkoi_38b527ad4d372c58270e7b04fca4e29c39befad01e52aaffef855dab0fbfe9de",
+  "Secret": "bkoi_38b527ad4d372c58270e7b04fca4e29c39befad01e52aaffef855dab0fbfe9de",
+  "File": "docker-compose.yaml",
+  "SymlinkFile": "",
+  "Commit": "94f11d6666b882c663099023f866264102fb1e2f",
+  "Entropy": 4.0081496,
+  "Author": "sarikamahboob",
+  "Email": "sarika.mahboob1234@gmail.com",
+  "Date": "2025-04-08T06:20:35Z",
+  "Message": "feat: prod workflow file added",
+  "Tags": [],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "94f11d6666b882c663099023f866264102fb1e2f:docker-compose.yaml:generic-api-key:10"
+ },
+ {
+  "Description": "Generic API Key",
+  "StartLine": 9,
+  "EndLine": 10,
+  "StartColumn": 30,
+  "EndColumn": 1,
+  "Match": "API_KEY=bkoi_38b527ad4d372c58270e7b04fca4e29c39befad01e52aaffef855dab0fbfe9de",
+  "Secret": "bkoi_38b527ad4d372c58270e7b04fca4e29c39befad01e52aaffef855dab0fbfe9de",
+  "File": "docker-compose.yaml",
+  "SymlinkFile": "",
+  "Commit": "eec752e58216c8cc62e24e62e29423d812b4335e",
+  "Entropy": 4.0081496,
+  "Author": "sarikamahboob",
+  "Email": "sarika.mahboob1234@gmail.com",
+  "Date": "2025-03-20T06:35:11Z",
+  "Message": "fix: conflict resolved\n\ncommit bac661347de9ed6e125953f62ed77c89f2ae603a\nAuthor: sarikamahboob \u003csarika.mahboob1234@gmail.com\u003e\nDate:   Thu Mar 20 12:27:34 2025 +0600\n\nfeat: dockerized the project",
+  "Tags": [],
+  "RuleID": "generic-api-key",
+  "Fingerprint": "eec752e58216c8cc62e24e62e29423d812b4335e:docker-compose.yaml:generic-api-key:9"
+ }
+]

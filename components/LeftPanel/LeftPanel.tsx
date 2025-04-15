@@ -30,7 +30,7 @@ import {
 } from "react-icons/fa";
 import * as Papa from "papaparse";
 import Image from "next/image";
-import SPL from "../../app/images/SPL_Logo.webp";
+import SPL from "../../app/images/mcodonlds.png";
 import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
 import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
