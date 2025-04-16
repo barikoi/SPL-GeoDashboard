@@ -30,7 +30,7 @@ import {
 } from "react-icons/fa";
 import * as Papa from "papaparse";
 import Image from "next/image";
-import SPL from "../../app/images/SPL_Logo.webp";
+import SPL from "../../app/images/mcodonlds.png";
 import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
 import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
@@ -587,6 +587,8 @@ const LeftPanel = () => {
   // Change this condition
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
+  console.log({populationFile})
+
   return (
     <div
       className={`w-full md:w-[22vw] h-[50vh] md:h-screen p-3 md:p-4 z-10 shadow-xl overflow-y-auto ${
@@ -1087,7 +1089,7 @@ const LeftPanel = () => {
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
-                !populationFile 
+                !populationFile ?  "opacity-50 cursor-not-allowed" : ""
                 // ||
                 // (!hasCoverageColumn && !datasets
                 //   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
