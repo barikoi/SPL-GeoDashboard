@@ -443,54 +443,54 @@ const LeftPanel = () => {
     }
 
     // Filter datasets based on selected option
-    const filteredDatasets = datasets.filter(dataset => 
-      dataset.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase()
-    );
+    // const filteredDatasets = datasets.filter(dataset => 
+    //   dataset.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase()
+    // );
 
     // Check if either coverage column exists or isochrones are calculated
-    const hasIsochrones = filteredDatasets.some((dataset) => dataset.hasIsochrones);
-    if (!hasCoverageColumn && !hasIsochrones) {
-      message.error("Please calculate walkable coverage first.");
-      return;
-    }
+    // const hasIsochrones = filteredDatasets.some((dataset) => dataset.hasIsochrones);
+    // if (!hasCoverageColumn && !hasIsochrones) {
+    //   message.error("Please calculate walkable coverage first.");
+    //   return;
+    // }
 
     setIsCalculating(true);
     setUploadProgress(0);
 
     try {
       // Get the dataset with coverage (either from file or calculated)
-      const dataset = hasCoverageColumn ? filteredDatasets[0] : filteredDatasets.find((d) => d.hasIsochrones);
-      if (!dataset) {
-        throw new Error("No dataset with coverage found");
-      }
+      // const dataset = hasCoverageColumn ? filteredDatasets[0] : filteredDatasets.find((d) => d.hasIsochrones);
+      // if (!dataset) {
+      //   throw new Error("No dataset with coverage found");
+      // }
 
-      // Create CSV with coverage data
-      const csvData = dataset.data.map((point) => ({
-        ...point.properties,
-        latitude: point.latitude,
-        longitude: point.longitude,
-        coverage: point.coverage ? JSON.stringify(point.coverage) : null,
-      }));
+      // // Create CSV with coverage data
+      // const csvData = dataset.data.map((point) => ({
+      //   ...point.properties,
+      //   latitude: point.latitude,
+      //   longitude: point.longitude,
+      //   coverage: point.coverage ? JSON.stringify(point.coverage) : null,
+      // }));
 
-      // Create form data for hub locations
-      const hubFormData = new FormData();
-      const csvBlob = new Blob([Papa.unparse(csvData)], { type: "text/csv" });
-      hubFormData.append("file", csvBlob, dataset.name);
+      // // Create form data for hub locations
+      // const hubFormData = new FormData();
+      // const csvBlob = new Blob([Papa.unparse(csvData)], { type: "text/csv" });
+      // hubFormData.append("file", csvBlob, dataset.name);
 
-      // Upload hub locations with coverage
-      const hubResponse = await fetch(
-        `${BASE_URL}/upload_hub_locations/`,
-        {
-          method: "POST",
-          body: hubFormData,
-          headers: {
-            Accept: "*/*",
-          },
-          mode: "cors",
-        }
-      );
+      // // Upload hub locations with coverage
+      // const hubResponse = await fetch(
+      //   `${BASE_URL}/upload_hub_locations/`,
+      //   {
+      //     method: "POST",
+      //     body: hubFormData,
+      //     headers: {
+      //       Accept: "*/*",
+      //     },
+      //     mode: "cors",
+      //   }
+      // );
 
-      if (!hubResponse.ok) throw new Error("Hub locations upload failed.");
+      // if (!hubResponse.ok) throw new Error("Hub locations upload failed.");
       setUploadProgress(33);
 
       // Upload population file
@@ -637,7 +637,7 @@ const LeftPanel = () => {
       </div>
 
       {/* Step 1: More compact padding and text */}
-      <div
+      {/* <div
         className={`mb-4 p-3 rounded-lg shadow-sm ${
           isNightMode ? "bg-gray-700" : "bg-white"
         }`}
@@ -649,7 +649,7 @@ const LeftPanel = () => {
         >
           Upload Hub Locations
         </h2>
-        {/* For Parcelat Points */}
+        For Parcelat Points
         <h3
           className={`text-xs md:text-sm font-semibold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
@@ -668,7 +668,7 @@ const LeftPanel = () => {
           }`}
         />
 
-        {/* Dataset list with download options */}
+        Dataset list with download options
         {fileUploadedForParcelat && (
           <div className="mb-3">
             <h3
@@ -755,7 +755,7 @@ const LeftPanel = () => {
           </div>
         )}
 
-        {/* For Competitor Points */}
+        For Competitor Points
         <h3
           className={`text-xs md:text-sm font-semibold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
@@ -774,7 +774,7 @@ const LeftPanel = () => {
           }`}
         />
 
-        {/* Dataset list with download options */}
+        Dataset list with download options
         {fileUploadedForCompetitor && (
           <div className="mb-3">
             <h3
@@ -861,7 +861,7 @@ const LeftPanel = () => {
           </div>
         )}
 
-      </div>
+      </div> */}
 
       {/* Step 2: More compact dataset list and controls */}
       {(fileUploadedForParcelat || fileUploadedForCompetitor) && !hasCoverageColumn && (
@@ -1038,23 +1038,62 @@ const LeftPanel = () => {
           )}
 
           {
+            // <button
+            //   onClick={handleCalculatePopulation}
+            //   disabled={
+            //     isCalculating ||
+            //     !populationFile ||
+            //     (!hasCoverageColumn && !datasets
+            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+            //       .some((d) => d.hasIsochrones))
+            //   }
+            //   className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
+            //     isCalculating ||
+            //     !populationFile ||
+            //     (!hasCoverageColumn && !datasets
+            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+            //       .some((d) => d.hasIsochrones))
+            //       ? "opacity-50 cursor-not-allowed"
+            //       : ""
+            //   }`}
+            // >
+            //   {isCalculating ? (
+            //     <div className="flex items-center justify-center">
+            //       <Spin className="mr-1.5" size="small" />
+            //       Calculating...
+            //     </div>
+            //   ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
+            //     "Upload Hub Locations"
+            //   ) : !hasCoverageColumn && //NOSONAR
+            //     !datasets
+            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+            //       .some((d) => d.hasIsochrones) ? (
+            //     "Calculate Walkable Coverage"
+            //   ) : !populationFile ? ( //NOSONAR
+            //     "Upload Population File"
+            //   ) : (
+            //     "Calculate Population Coverage"
+            //   )}
+            // </button>
             <button
               onClick={handleCalculatePopulation}
               disabled={
                 isCalculating ||
-                !populationFile ||
-                (!hasCoverageColumn && !datasets
-                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-                  .some((d) => d.hasIsochrones))
+                !populationFile 
+                // ||
+                // (!hasCoverageColumn && !datasets
+                //   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                //   .some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
-                !populationFile ||
-                (!hasCoverageColumn && !datasets
-                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-                  .some((d) => d.hasIsochrones))
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
+                !populationFile 
+                // ||
+                // (!hasCoverageColumn && !datasets
+                //   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                //   .some((d) => d.hasIsochrones))
+                //   ? "opacity-50 cursor-not-allowed"
+                //   : ""
               }`}
             >
               {isCalculating ? (
@@ -1062,13 +1101,6 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
-                "Upload Hub Locations"
-              ) : !hasCoverageColumn && //NOSONAR
-                !datasets
-                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-                  .some((d) => d.hasIsochrones) ? (
-                "Calculate Walkable Coverage"
               ) : !populationFile ? ( //NOSONAR
                 "Upload Population File"
               ) : (
