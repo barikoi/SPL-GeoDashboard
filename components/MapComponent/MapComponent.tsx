@@ -1397,8 +1397,6 @@ function MapComponent() {
           essential: true
         });
       }
-      
-      console.log(`Arid grid layer ${isShowAridGrid ? 'shown' : 'hidden'} successfully`);
     } catch (error) {
       console.error("Error toggling arid grid layer:", error);
     }

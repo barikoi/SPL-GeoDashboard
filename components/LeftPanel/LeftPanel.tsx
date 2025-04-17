@@ -1,7 +1,7 @@
 // @ts-nocheck
 // components/LeftPanel.tsx
 "use client";
-import React, { ChangeEvent, useState } from "react";
+import React, { ChangeEvent, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   addDataset,
@@ -37,6 +37,8 @@ import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
 import CalculateWalkableCoverageModal from "./CalculateWalkableCoverageModal";
 import { BASE_URL } from "@/app.config";
+import { setIsShowPopulationFilter, setPopulationFileForFilter } from "@/store/filterSlice";
+import FilterPanel from "./FilterPanel";
 
 // Update the downloadCSV function with proper types
 const downloadCSV = (dataset: {
@@ -396,15 +398,20 @@ const LeftPanel = () => {
           complete: (results) => {
             // Validate required columns
             const headers = results.meta.fields || [];
-            const requiredColumns = ['Latitude', 'Longitude'];
-            const missingColumns = requiredColumns.filter(col => 
-              !headers.some(header => header.toLowerCase() === col.toLowerCase())
+            const requiredColumns = ['latitude', 'longitude', 'nationality', 'gender', 'occupationmode', 'age group'];
+            // Convert both headers and required columns to lowercase for case-insensitive comparison
+            const lowercaseHeaders = headers.map(header => header.toLowerCase());
+            const lowercaseRequired = requiredColumns.map(col => col.toLowerCase());
+            
+            const missingColumns = lowercaseRequired.filter(col => 
+              !lowercaseHeaders.includes(col)
             );
 
             if (missingColumns.length > 0) {
               message.error(
                 `Missing required columns: ${missingColumns.join(', ')}. ` +
-                'Please ensure your population file contains Latitude and Longitude columns.'
+                'Please ensure your population file contains Nationality, Gender, OccupationMode, Age Group, Latitude and Longitude columns.',
+                5 
               );
               return;
             }
@@ -587,7 +594,12 @@ const LeftPanel = () => {
   // Change this condition
   const showPopulationSection = datasets.some((dataset) => dataset.visible);
 
-  console.log({populationFile})
+  useEffect(()=> {
+    if(populationFile){
+      dispatch(setIsShowPopulationFilter(true))
+      dispatch(setPopulationFileForFilter(populationFile))
+    }
+  }, [populationFile])
 
   return (
     <div
@@ -1038,7 +1050,9 @@ const LeftPanel = () => {
               </div>
             </div>
           )}
-
+          {
+            <FilterPanel/>
+          }
           {
             // <button
             //   onClick={handleCalculatePopulation}

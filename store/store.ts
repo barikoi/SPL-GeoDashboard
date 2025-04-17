@@ -1,10 +1,12 @@
 // store/store.ts
 import { configureStore } from "@reduxjs/toolkit";
 import mapReducer from "./mapSlice";
+import filterReducer from "./filterSlice";
 
 export const store = configureStore({
   reducer: {
     map: mapReducer,
+    filter: filterReducer,
   },
 });
 
