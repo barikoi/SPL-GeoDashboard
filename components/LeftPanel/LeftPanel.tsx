@@ -88,6 +88,10 @@ const LeftPanel = () => {
   const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
   const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
   const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
+  const selectedGender = useSelector((state: RootState) => state.filter.selectedGender); 
+  const selectedNationality = useSelector((state: RootState) => state.filter.selectedNationality); 
+  const selectedOccupationMode = useSelector((state: RootState) => state.filter.selectedOccupationMode); 
+  const selectedAgeGroup = useSelector((state: RootState) => state.filter.selectedAgeGroup); 
 
   const options: CheckboxGroupProps<string>['options'] = [
     { 
@@ -408,8 +412,11 @@ const LeftPanel = () => {
             );
 
             if (missingColumns.length > 0) {
+              const capitalizedMissingColumns = missingColumns.map(col => 
+                col.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+              );
               message.error(
-                `Missing required columns: ${missingColumns.join(', ')}. ` +
+                `Missing required columns: ${capitalizedMissingColumns.join(', ')}. ` +
                 'Please ensure your population file contains Nationality, Gender, OccupationMode, Age Group, Latitude and Longitude columns.',
                 5 
               );
@@ -520,8 +527,14 @@ const LeftPanel = () => {
       setUploadProgress(66);
 
       // Calculate hubs
+      const params = new URLSearchParams();
+      if (selectedGender) params.append('gender', selectedGender);
+      if (selectedNationality) params.append('nationality', selectedNationality);
+      if (selectedOccupationMode) params.append('occupation_mode', selectedOccupationMode);
+      if (selectedAgeGroup) params.append('age_group', selectedAgeGroup);
+
       const calculateResponse = await fetch(
-        `${BASE_URL}/calculate_hubs/?radius=2000`,
+        `${BASE_URL}/calculate_hubs/?radius=2000&${params.toString()}`,
         {
           method: "POST",
           headers: {
@@ -1054,62 +1067,15 @@ const LeftPanel = () => {
             <FilterPanel/>
           }
           {
-            // <button
-            //   onClick={handleCalculatePopulation}
-            //   disabled={
-            //     isCalculating ||
-            //     !populationFile ||
-            //     (!hasCoverageColumn && !datasets
-            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-            //       .some((d) => d.hasIsochrones))
-            //   }
-            //   className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
-            //     isCalculating ||
-            //     !populationFile ||
-            //     (!hasCoverageColumn && !datasets
-            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-            //       .some((d) => d.hasIsochrones))
-            //       ? "opacity-50 cursor-not-allowed"
-            //       : ""
-            //   }`}
-            // >
-            //   {isCalculating ? (
-            //     <div className="flex items-center justify-center">
-            //       <Spin className="mr-1.5" size="small" />
-            //       Calculating...
-            //     </div>
-            //   ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
-            //     "Upload Hub Locations"
-            //   ) : !hasCoverageColumn && //NOSONAR
-            //     !datasets
-            //       .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-            //       .some((d) => d.hasIsochrones) ? (
-            //     "Calculate Walkable Coverage"
-            //   ) : !populationFile ? ( //NOSONAR
-            //     "Upload Population File"
-            //   ) : (
-            //     "Calculate Population Coverage"
-            //   )}
-            // </button>
             <button
               onClick={handleCalculatePopulation}
               disabled={
                 isCalculating ||
                 !populationFile 
-                // ||
-                // (!hasCoverageColumn && !datasets
-                //   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-                //   .some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
                 !populationFile ?  "opacity-50 cursor-not-allowed" : ""
-                // ||
-                // (!hasCoverageColumn && !datasets
-                //   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
-                //   .some((d) => d.hasIsochrones))
-                //   ? "opacity-50 cursor-not-allowed"
-                //   : ""
               }`}
             >
               {isCalculating ? (
@@ -1117,7 +1083,7 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : !populationFile ? ( //NOSONAR
+              ) : !populationFile ? (
                 "Upload Population File"
               ) : (
                 "Calculate Population Coverage"
