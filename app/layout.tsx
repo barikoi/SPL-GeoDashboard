@@ -1,5 +1,6 @@
 // app/layout.tsx
 "use client";
+
 import { Provider } from "react-redux";
 import { store } from "@/store/store";
 import "./globals.css"; // Import the global CSS file

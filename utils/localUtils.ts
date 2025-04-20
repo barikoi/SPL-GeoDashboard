@@ -1,5 +1,6 @@
 import { DataPoint } from "@/types/leftPanelTypes";
 import type { Geometry } from "geojson";
+import { Feature } from "maplibre-gl";
 
 export const getRandomColor = (): [number, number, number] => {
   const colors: [number, number, number][] = [
@@ -38,7 +39,7 @@ export const getRandomColor = (): [number, number, number] => {
 // Add a static property to store last used color
 getRandomColor.lastColor = null;
 
-export const parseString = (data: string): any => {
+export const parseString = (data: string): Record<string, unknown> | null => {
   try {
     return JSON.parse(data);
   } catch (error) {
@@ -47,7 +48,7 @@ export const parseString = (data: string): any => {
   }
 };
 
-export const normalizeData = ( data: Record<string, any>[], fileType: "csv" | "json"): DataPoint[] => {
+export const normalizeData = ( data: Record<string, unknown>[], fileType: "csv" | "json"): DataPoint[] => {
   if (fileType === "csv") {
     return data.map((row) => ({
       latitude: parseFloat(String(row.latitude)),
@@ -68,15 +69,14 @@ export const normalizeData = ( data: Record<string, any>[], fileType: "csv" | "j
     }));
   } else if (fileType === "json") {
     if ("features" in data) {
-      // @ts-ignore
-      return data.features.map((feature: any) => ({
+      return (data as { features: Feature[] }).features.map((feature) => ({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
         properties: feature.properties,
         geojson: JSON.stringify(feature),
       }));
     } else {
-      return data.map((item: any) => ({
+      return (data as { latitude: number; longitude: number }[]).map((item) => ({
         latitude: item.latitude,
         longitude: item.longitude,
         properties: { ...item },
@@ -94,7 +94,7 @@ export const normalizeData = ( data: Record<string, any>[], fileType: "csv" | "j
   return [];
 };
 
-export const transformIsochroneToGeometry = (isochrone: any): Geometry | null => {
+export const transformIsochroneToGeometry = (isochrone: { polygons: { geometry: { coordinates: number[][][] } }[] }): Geometry | null => {
   if (!isochrone || !isochrone.polygons || !Array.isArray(isochrone.polygons)) {
     console.error("Invalid isochrone data:", isochrone);
     return null;

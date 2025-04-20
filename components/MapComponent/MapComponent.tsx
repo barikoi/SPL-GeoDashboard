@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // components/MapComponent.tsx
 import * as React from "react";
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   AttributionControl,
   Map,
@@ -8,9 +9,10 @@ import {
   MapRef,
   FullscreenControl,
   NavigationControl,
+  Popup,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer } from "deck.gl";
+import { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
@@ -21,22 +23,22 @@ import {
   toggleBuildingShow,
   toggleRegionShow,
   setSuggestedHubsIsochrones,
-  setSuggestedHubs,
   toggleRiyadhCityShow,
   setIsFetchingIsochrones,
+  toggleAlMalazShow,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import { Progress, message, Button, Tooltip } from "antd"; 
+import { Progress, message } from "antd"; 
 import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
+import { getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
 import { FaEye, FaEyeSlash, FaCalculator } from "react-icons/fa";
-import { HeatMapOutlined, BorderOutlined } from "@ant-design/icons";
+import { HeatMapOutlined } from "@ant-design/icons";
 import * as turf from '@turf/turf';
 import CoverageStats from "./CoverageStats";
 import { BASE_URL } from "@/app.config";
@@ -72,6 +74,7 @@ function MapComponent() {
   const isShowRegion = useSelector((state: RootState) => state.map.isShowRegion);
   const suggestedHubsIsochrones = useSelector((state: RootState) => state.map.suggestedHubsIsochrones);
   const isShowRiyadhCity = useSelector((state: RootState) => state.map.isShowRiyadhCity);
+  const isShowAlMalaz = useSelector((state: RootState) => state.map.isShowAlMalaz);
   const isShowSuggestedHubsCoverage = useSelector((state: RootState) => state.map.isShowSuggestedHubsCoverage);
   const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
   const isGetSuggestedHubsWalkingDistanceButtonClicked = useSelector((state: RootState) => state.map.isGetSuggestedHubsWalkingDistanceButtonClicked);
@@ -113,6 +116,7 @@ function MapComponent() {
     timestamp: number;
   }>>([]);
   const [riyadhCityData, setRiyadhCityData] = useState<any>(null);
+  const [alMalazData, setAlMalazData] = useState<any>(null);
   const [isShowAridGrid, setIsShowAridGrid] = useState(false);
 
   // Toggle night and white modes
@@ -177,6 +181,7 @@ function MapComponent() {
   }, []);
 
   // Update the tooltip handler
+  // @ts-ignore
   const getTooltip = (info: PickingInfo) => {
     const { object, x, y } = info;
 
@@ -375,6 +380,8 @@ function MapComponent() {
     };
   }, []);
 
+  console.log({alMalazData})
+
   // Update the useEffect for datasets.length
   // useEffect(() => {
   //   // When datasets change, check if a new one was added
@@ -447,7 +454,45 @@ function MapComponent() {
               x: info.x,
               y: info.y,
               // @ts-ignore
-              type: "riyadh-city"
+              type: "riyadh-city",
+              coordinates: info.coordinate
+            });
+          } else {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : []),
+    ...(isShowAlMalaz && alMalazData ? [
+      new GeoJsonLayer({
+        id: 'al-malaz-layer',
+        data: alMalazData,
+        getFillColor: isNightMode 
+        ? [192, 192, 192, 200] // Silver for night mode with good opacity
+        : [128, 0, 128, 70], // Purple for day mode with better opacity
+        getLineColor: isNightMode 
+        ? [105, 105, 105, 200] // Dark gray border for night mode
+        : [75, 0, 130, 200], // Indigo border for day mode
+        getLineWidth: 3,
+        pickable: true,
+        stroked: true,
+        filled: true,
+        wireframe: true,
+        // @ts-ignore
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: {
+                properties: {
+                  name: "Al-Malaz",
+                  type: "Al-Malaz"
+                }
+              },
+              x: info.x,
+              y: info.y,
+              // @ts-ignore
+              type: "al-malaz",
+              coordinates: info.coordinate
             });
           } else {
             setHoverInfo(null);
@@ -531,7 +576,8 @@ function MapComponent() {
               x: info.x,
               y: info.y,
               // @ts-ignore
-              type: "province"
+              type: "province",
+              coordinates: info.coordinate
             });
           } else {
             setHoverInfo(null);
@@ -547,16 +593,16 @@ function MapComponent() {
         data: populationPoints,
         getPosition: (d) => d,
         radius: 500,
-        elevationScale: 20,
+        elevationScale: 0,
         pickable: true,
         extruded: true,
         colorRange: [
-          [237, 248, 125], // Light Yellow (Low population)
-          [254, 192, 206], // Light Teal
-          [227, 135, 158], // Teal
-          [209, 131, 201], // Medium Dark Blue
-          [139, 95, 191], // Dark Blue
-          [100, 58, 113], // Very Dark Blue (High population)
+          [237, 248, 125, 200], // Light Yellow (Low population)
+          [254, 192, 206, 200], // Light Teal
+          [227, 135, 158, 200], // Teal
+          [209, 131, 201, 200], // Medium Dark Blue
+          [139, 95, 191, 200], // Dark Blue
+          [100, 58, 113, 200], // Very Dark Blue (High population)
         ],
         coverage: 1,
         upperPercentile: 100,
@@ -579,6 +625,7 @@ function MapComponent() {
               x: info.x,
               y: info.y,
               type: "hexagon",
+              coordinates: info.coordinate
             });
           } else {
             setHoverInfo(null); // Clear hover info when not hovering
@@ -608,14 +655,15 @@ function MapComponent() {
           [255, 0, 128], // Pink
           [255, 0, 255] // Magenta (High population)
         ],
-        // @ts-ignore
+        // @ts-expect-error
         onHover: (info:any) => {
           if (info.layer.count) {
             setHoverInfo({
               object: { count: info.layer.count},
               x: info.x,
               y: info.y,
-              type: "HeatmapLayer"
+              type: "HeatmapLayer",
+              coordinates: info.coordinate
             });
           } else {
             setHoverInfo(null);
@@ -1344,7 +1392,18 @@ function MapComponent() {
       }
     };
 
+    const loadAlMalazData = async () => {
+      try {
+        const response = await fetch('al-malaz.json');
+        const data = await response.json();
+        setAlMalazData(data);
+      } catch (error) {
+        console.error('Error loading Riyadh city data:', error);
+      }
+    };
+
     loadRiyadhCityData();
+    loadAlMalazData();
   }, [])
 
   // Create a function to add the grid layer
@@ -1407,6 +1466,10 @@ function MapComponent() {
     setIsShowAridGrid(prev => !prev);
   };
 
+  const _onClosePopup = () => {
+    setHoverInfo(null)
+  }
+
   // Add useEffect to respond to isShowAridGrid changes
   // useEffect(() => {
   //   if (mapRef.current && mapRef.current.getMap()) {
@@ -1437,6 +1500,34 @@ function MapComponent() {
           attributionControl={false}
           hash={true}
         >
+          {
+            hoverInfo?.object && ( 
+              <Popup
+                longitude={ hoverInfo?.coordinates[0] ?? -100 }
+                latitude={  hoverInfo?.coordinates[1] ?? 40 }
+                anchor="bottom"
+                onClose={ _onClosePopup }
+                style={{ zIndex: 1000 }}
+              >
+                <span style={{ display: 'flex', flexDirection: 'column', maxHeight: '280px', overflow: 'auto', color: '#464A4D' }}>
+                  {(hoverInfo.type === "HeatmapLayer" || hoverInfo.type === "hexagon") ? (
+                    <div className="space-y-1">
+                      <div className="font-semibold text-gray-800">
+                        Population Density
+                      </div>
+                      <div>
+                        <strong>Count:</strong> {hoverInfo.object.count} points
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="font-medium text-gray-800">
+                      {hoverInfo.object?.properties?.name}
+                    </div>
+                  )}
+                </span>
+              </Popup>
+            )
+          }
           <AttributionControl
             customAttribution="Barikoi"
             position="bottom-right"
@@ -1470,6 +1561,12 @@ function MapComponent() {
               onClick={() => dispatch(toggleRiyadhCityShow())}
               icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >R</span> }
               isActive={isShowRiyadhCity}
+            />
+            <MapControlButton
+              title={isShowAlMalaz ? "Hide Al-Malaz" : "Show Al-Malaz"}
+              onClick={() => dispatch(toggleAlMalazShow())}
+              icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >M</span> }
+              isActive={isShowAlMalaz}
             />
             <MapControlButton
               title="Calculate Coverage"
@@ -1515,7 +1612,7 @@ function MapComponent() {
         </div>
       )}
 
-      {hoverInfo && (
+      {/* {hoverInfo && (
         <div
           className="absolute z-10 pointer-events-none bg-white p-2 md:p-4 rounded-lg shadow-md text-sm md:text-base"
           style={{ left: hoverInfo.x, top: hoverInfo.y }}
@@ -1535,7 +1632,9 @@ function MapComponent() {
             </div>
           )}
         </div>
-      )}
+      )} */}
+
+      
     </div>
   );
 }

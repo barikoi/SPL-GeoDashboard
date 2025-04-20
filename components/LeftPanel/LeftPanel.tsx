@@ -245,6 +245,7 @@ const LeftPanel = () => {
     reader.readAsText(file);
   }; 
   
+  // @ts-ignore
   const handleFileChangeForCompetitor = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !files[0]) {
@@ -402,24 +403,20 @@ const LeftPanel = () => {
           complete: (results) => {
             // Validate required columns
             const headers = results.meta.fields || [];
-            const requiredColumns = ['latitude', 'longitude', 'nationality', 'gender', 'occupationmode', 'age group'];
-            // Convert both headers and required columns to lowercase for case-insensitive comparison
-            const lowercaseHeaders = headers.map(header => header.toLowerCase());
-            const lowercaseRequired = requiredColumns.map(col => col.toLowerCase());
+            const requiredColumns = ['Latitude', 'Longitude', 'Nationality', 'Gender', 'OccupationMode', 'Age Group'];
             
-            const missingColumns = lowercaseRequired.filter(col => 
-              !lowercaseHeaders.includes(col)
+            const missingColumns = requiredColumns.filter(col => 
+              !headers.includes(col)
             );
 
             if (missingColumns.length > 0) {
-              const capitalizedMissingColumns = missingColumns.map(col => 
-                col.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-              );
-              message.error(
-                `Missing required columns: ${capitalizedMissingColumns.join(', ')}. ` +
+              message.error({
+                content: `Missing required columns: ${missingColumns.join(', ')}. ` +
                 'Please ensure your population file contains Nationality, Gender, OccupationMode, Age Group, Latitude and Longitude columns.',
-                5 
-              );
+                duration: 5,
+                style: { marginTop: '25vh', width: '500px' },
+                className: "validation-message"
+              });
               return;
             }
 

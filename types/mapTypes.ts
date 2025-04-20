@@ -28,4 +28,5 @@ export interface HoverInfo {
   x: number;
   y: number;
   type: "point" | "hexagon" | "suggested" | "HeatmapLayer";
+  coordinates: any;
 }

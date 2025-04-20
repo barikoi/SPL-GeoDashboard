@@ -6,3 +6,10 @@ export interface DataPoint {
   isochrones?: unknown;
   coverage?: unknown;
 }
+
+export interface Feature {
+  geometry: {
+    coordinates: [number, number];
+  };
+  properties: Record<string, unknown>;
+}
