@@ -41,6 +41,7 @@ interface MapState {
   suggestedHubsIsochrones: any[];
   isShowRiyadhCity: boolean; 
   isShowAlMalaz: boolean; 
+  isShowPOI: boolean; 
   isShowSuggestedHubsCoverage: boolean;
   isShowWalkingDistanceVisibility: boolean;
   isGetSuggestedHubsWalkingDistanceButtonClicked: boolean;
@@ -65,6 +66,7 @@ const initialState: MapState = {
   suggestedHubsIsochrones: null,
   isShowRiyadhCity: false,
   isShowAlMalaz: false,
+  isShowPOI: false,
   isShowSuggestedHubsCoverage: true,
   isShowWalkingDistanceVisibility: true,
   isGetSuggestedHubsWalkingDistanceButtonClicked: false,
@@ -191,6 +193,9 @@ const mapSlice = createSlice({
     toggleAlMalazShow: (state) => {
       state.isShowAlMalaz = !state.isShowAlMalaz; 
     },
+    togglePOIShow: (state) => {
+      state.isShowPOI = !state.isShowPOI; 
+    },
   },
 });
 
@@ -221,6 +226,7 @@ export const {
   setIsFetchingIsochrones,
   setIsWalkableCoverageModalVisible,
   setSelectedOptionForWalkableCoverage,
-  toggleAlMalazShow
+  toggleAlMalazShow,
+  togglePOIShow
 } = mapSlice.actions;
 export default mapSlice.reducer;

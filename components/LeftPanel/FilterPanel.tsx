@@ -49,7 +49,7 @@ const FilterPanel = () => {
             const value = row['age group'] || row['Age Group'];
             return value && typeof value === 'string' ? value.toLowerCase() : null;
           }).filter(val => val !== null && val !== 'null'))];
-          console.log({uniqueNationalities, uniqueGenders, uniqueOccupationModes, uniqueAgeGroups})
+
           setNationalities(uniqueNationalities);
           setGenders(uniqueGenders);
           setOccupationModes(uniqueOccupationModes);

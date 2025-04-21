@@ -26,6 +26,7 @@ import {
   toggleRiyadhCityShow,
   setIsFetchingIsochrones,
   toggleAlMalazShow,
+  togglePOIShow,
 } from "@/store/mapSlice";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Progress, message } from "antd"; 
@@ -33,7 +34,7 @@ import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
+import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
@@ -66,7 +67,7 @@ function MapComponent() {
   const datasets = useSelector((state: RootState) => state.map.datasets);
   const timeLimit = useSelector((state: RootState) => state.map.timeLimit);
   const showIsochrones = useSelector((state: RootState) => state.map.showIsochrones);
-  const suggestedHubs = useSelector((state: RootState) => state.map.suggestedHubs);
+  const suggestedHubs:any = useSelector((state: RootState) => state.map.suggestedHubs);
   const populationLayerVisible = useSelector((state: RootState) => state.map.populationLayerVisible);
   const isNightMode = useSelector((state: RootState) => state.map.isNightMode);
   const deckglLayer = useSelector((state: RootState) => state.map.deckglLayer);
@@ -75,6 +76,7 @@ function MapComponent() {
   const suggestedHubsIsochrones = useSelector((state: RootState) => state.map.suggestedHubsIsochrones);
   const isShowRiyadhCity = useSelector((state: RootState) => state.map.isShowRiyadhCity);
   const isShowAlMalaz = useSelector((state: RootState) => state.map.isShowAlMalaz);
+  const isShowPOI = useSelector((state: RootState) => state.map.isShowPOI);
   const isShowSuggestedHubsCoverage = useSelector((state: RootState) => state.map.isShowSuggestedHubsCoverage);
   const isShowWalkingDistanceVisibility = useSelector((state: RootState) => state.map.isShowWalkingDistanceVisibility);
   const isGetSuggestedHubsWalkingDistanceButtonClicked = useSelector((state: RootState) => state.map.isGetSuggestedHubsWalkingDistanceButtonClicked);
@@ -118,6 +120,7 @@ function MapComponent() {
   const [riyadhCityData, setRiyadhCityData] = useState<any>(null);
   const [alMalazData, setAlMalazData] = useState<any>(null);
   const [isShowAridGrid, setIsShowAridGrid] = useState(false);
+  const [poiData, setPoiData] = useState<any[]>([]);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
@@ -500,11 +503,37 @@ function MapComponent() {
         }
       })
     ] : []),
+    ...(isShowPOI && poiData.length > 0 ? [
+      new ScatterplotLayer({
+        id: `poi-layer`,
+        data: poiData,
+        getPosition: (d) => [d.longitude, d.latitude],
+        getRadius: 100,
+        getFillColor: (d) => d.p_type === 'Food' ? [255, 0, 0, 200] : [255, 140, 0, 200],
+        pickable: true,
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: {
+                properties: info.object
+              },
+              x: info.x,
+              y: info.y,
+              // @ts-ignore
+              type: "poi-points",
+              coordinates: info.coordinate
+            });
+          } else {
+            setHoverInfo(null);
+          }
+        }
+      }),
+    ] : []),
     ...((suggestedHubs && isShowSuggestedHubsCoverage) 
       ? [
           new GeoJsonLayer({
             id: "suggested-hubs-coverage",
-            data: suggestedHubs.map((hub) => ({
+            data: suggestedHubs.map((hub:any) => ({
               type: "Feature",
               geometry: JSON.parse(hub.coverage),
               properties: {},
@@ -1271,7 +1300,7 @@ function MapComponent() {
   }, [suggestedHubs, selectedOptionForWalkableCoverage]);
 
   // Update the calculateSuggestedHubsIsochronesStats function to preserve previous data
-  const calculateSuggestedHubsIsochronesStats = useCallback(async (hubs) => {
+  const calculateSuggestedHubsIsochronesStats = useCallback(async (hubs:any) => {
     if (!hubs || hubs.length === 0) return;
     try {
       let totalCoveredArea = 0;
@@ -1482,6 +1511,33 @@ function MapComponent() {
   //     }
   //   }
   // }, [isShowAridGrid]); // Re-run when isShowAridGrid changes
+  
+  // Add useEffect to load and process POI data
+  useEffect(() => {
+    const loadPoiData = async () => {
+      try {
+        const response = await fetch('/ksa_extension_data.csv');
+        const text = await response.text();
+        
+        Papa.parse(text, {
+          header: true,
+          dynamicTyping: true,
+          complete: (result) => {
+            setPoiData(result.data);
+          },
+          error: (error:any) => {
+            console.error('Error parsing POI CSV:', error);
+          }
+        });
+      } catch (error) {
+        console.error('Error loading POI data:', error);
+      }
+    };
+
+    loadPoiData();
+  }, []);
+
+  console.log({hoverInfo})
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
@@ -1519,6 +1575,27 @@ function MapComponent() {
                         <strong>Count:</strong> {hoverInfo.object.count} points
                       </div>
                     </div>
+                  ) : (hoverInfo.type === "poi-points") ? ( //NOSONAR
+                    <div className="space-y-1">
+                      <div>
+                        <strong>Place Name:</strong> {hoverInfo.object.properties.place_name}
+                      </div>
+                      <div>
+                        <strong>Address:</strong> {hoverInfo.object.properties.address}
+                      </div>
+                      <div>
+                        <strong>Sub Type:</strong> {hoverInfo.object.properties.sub_type}
+                      </div>
+                      <div>
+                        <strong>P Type:</strong> {hoverInfo.object.properties.p_type}
+                      </div> 
+                      <div>
+                        <strong>Website:</strong> {hoverInfo.object.properties.website}
+                      </div>
+                      <div>
+                        <strong>Status:</strong> {hoverInfo.object.properties.current_status}
+                      </div>
+                    </div>
                   ) : (
                     <div className="font-medium text-gray-800">
                       {hoverInfo.object?.properties?.name}
@@ -1536,7 +1613,7 @@ function MapComponent() {
           <FullscreenControl />
           <NavigationControl position="top-right" />
           <div
-            style={typeof window !== 'undefined' && window.screen.width > 350 && { ...Style }}
+            style={typeof window !== 'undefined' && window.screen.width > 350 ? { ...Style } : undefined}
           >
             <MapControlButton
               title={is3DMode ? "Switch to 3D" : "Switch to 2D"}
@@ -1567,6 +1644,12 @@ function MapComponent() {
               onClick={() => dispatch(toggleAlMalazShow())}
               icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >M</span> }
               isActive={isShowAlMalaz}
+            />
+            <MapControlButton
+              title={isShowPOI ? "Hide POI" : "Show POI"}
+              onClick={() => dispatch(togglePOIShow())}
+              icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >P</span> }
+              isActive={isShowPOI}
             />
             <MapControlButton
               title="Calculate Coverage"
