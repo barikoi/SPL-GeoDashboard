@@ -383,8 +383,6 @@ function MapComponent() {
     };
   }, []);
 
-  console.log({alMalazData})
-
   // Update the useEffect for datasets.length
   // useEffect(() => {
   //   // When datasets change, check if a new one was added
@@ -508,13 +506,11 @@ function MapComponent() {
         id: `poi-layer`,
         data: poiData,
         getPosition: (d) => [d.longitude, d.latitude],
-        getRadius: (info) => {
-          const zoom = mapRef.current?.getZoom() ?? 10;
-          // Adjust radius based on zoom level
-          if (zoom > 15) return 50;
-          if (zoom > 12 && zoom < 15) return 100;
-          return 20;
-        },
+        getRadius: 20, // Fixed radius for better visibility
+        radiusMinPixels: 2, // Minimum size in pixels
+        radiusMaxPixels: 14, // Maximum size in pixels
+        radiusScale: 100, // Scale factor for radius
+        radiusUnits: 'pixels', // Use pixels instead of meters
         getFillColor: (d) => d.p_type === 'Food' ? [255, 0, 0, 200] : [255, 140, 0, 200],
         pickable: true,
         onHover: (info: any) => {
@@ -1516,7 +1512,7 @@ function MapComponent() {
   //       map.once('style.load', addAridGridLayer);
   //     }
   //   }
-  // }, [isShowAridGrid]); // Re-run when isShowAridGrid changes
+  // }, [isShowAridGrid]); // Re-run when isShowAridGrid changed
   
   // Add useEffect to load and process POI data
   useEffect(() => {

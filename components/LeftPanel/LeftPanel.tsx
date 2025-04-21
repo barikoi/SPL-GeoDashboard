@@ -395,8 +395,6 @@ const LeftPanel = () => {
       return;
     }
 
-    console.log({file})
-
     const reader = new FileReader();
     const key = "error"
     reader.onload = (e) => {
@@ -666,7 +664,7 @@ const LeftPanel = () => {
       </div>
 
       {/* Step 1: More compact padding and text */}
-      {/* <div
+      <div
         className={`mb-4 p-3 rounded-lg shadow-sm ${
           isNightMode ? "bg-gray-700" : "bg-white"
         }`}
@@ -678,13 +676,13 @@ const LeftPanel = () => {
         >
           Upload Hub Locations
         </h2>
-        For Parcelat Points
+        {/* For Parcelat Points */}
         <h3
           className={`text-xs md:text-sm font-semibold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
           }`}
         >
-          Parcelat Points
+          {`McDonald's Branches`}
         </h3>
         <input
           type="file"
@@ -697,7 +695,7 @@ const LeftPanel = () => {
           }`}
         />
 
-        Dataset list with download options
+        {/* Dataset list with download options */}
         {fileUploadedForParcelat && (
           <div className="mb-3">
             <h3
@@ -784,7 +782,7 @@ const LeftPanel = () => {
           </div>
         )}
 
-        For Competitor Points
+        {/* For Competitor Points */}
         <h3
           className={`text-xs md:text-sm font-semibold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
@@ -803,7 +801,7 @@ const LeftPanel = () => {
           }`}
         />
 
-        Dataset list with download options
+        {/* Dataset list with download options */}
         {fileUploadedForCompetitor && (
           <div className="mb-3">
             <h3
@@ -889,8 +887,7 @@ const LeftPanel = () => {
             }
           </div>
         )}
-
-      </div> */}
+      </div> 
 
       {/* Step 2: More compact dataset list and controls */}
       {(fileUploadedForParcelat || fileUploadedForCompetitor) && !hasCoverageColumn && (
@@ -1073,11 +1070,19 @@ const LeftPanel = () => {
               onClick={handleCalculatePopulation}
               disabled={
                 isCalculating ||
-                !populationFile 
+                !populationFile ||
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
               }
               className={`w-full py-1.5 px-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm text-xs font-medium ${
                 isCalculating ||
-                !populationFile ?  "opacity-50 cursor-not-allowed" : ""
+                !populationFile ||
+                (!hasCoverageColumn && !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones))
+                  ? "opacity-50 cursor-not-allowed"
+                  : ""
               }`}
             >
               {isCalculating ? (
@@ -1085,7 +1090,14 @@ const LeftPanel = () => {
                   <Spin className="mr-1.5" size="small" />
                   Calculating...
                 </div>
-              ) : !populationFile ? (
+              ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
+                "Upload Hub Locations"
+              ) : !hasCoverageColumn && //NOSONAR
+                !datasets
+                  .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
+                  .some((d) => d.hasIsochrones) ? (
+                "Calculate Walkable Coverage"
+              ) : !populationFile ? ( //NOSONAR
                 "Upload Population File"
               ) : (
                 "Calculate Population Coverage"
