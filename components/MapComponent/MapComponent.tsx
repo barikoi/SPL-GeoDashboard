@@ -508,7 +508,13 @@ function MapComponent() {
         id: `poi-layer`,
         data: poiData,
         getPosition: (d) => [d.longitude, d.latitude],
-        getRadius: 100,
+        getRadius: (info) => {
+          const zoom = mapRef.current?.getZoom() ?? 10;
+          // Adjust radius based on zoom level
+          if (zoom > 15) return 50;
+          if (zoom > 12 && zoom < 15) return 100;
+          return 20;
+        },
         getFillColor: (d) => d.p_type === 'Food' ? [255, 0, 0, 200] : [255, 140, 0, 200],
         pickable: true,
         onHover: (info: any) => {
@@ -1537,8 +1543,6 @@ function MapComponent() {
     loadPoiData();
   }, []);
 
-  console.log({hoverInfo})
-
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
       {/* <DeckGL 
@@ -1575,6 +1579,7 @@ function MapComponent() {
                         <strong>Count:</strong> {hoverInfo.object.count} points
                       </div>
                     </div>
+                    //@ts-ignore
                   ) : (hoverInfo.type === "poi-points") ? ( //NOSONAR
                     <div className="space-y-1">
                       <div>

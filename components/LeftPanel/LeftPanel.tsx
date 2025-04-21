@@ -395,7 +395,10 @@ const LeftPanel = () => {
       return;
     }
 
+    console.log({file})
+
     const reader = new FileReader();
+    const key = "error"
     reader.onload = (e) => {
       if (e.target?.result) {
         Papa.parse(e.target.result as string, {
@@ -415,8 +418,9 @@ const LeftPanel = () => {
                 'Please ensure your population file contains Nationality, Gender, OccupationMode, Age Group, Latitude and Longitude columns.',
                 duration: 5,
                 style: { marginTop: '25vh', width: '500px' },
-                className: "validation-message"
-              });
+                className: "validation-message",
+                key
+              }); 
               return;
             }
 
@@ -436,10 +440,11 @@ const LeftPanel = () => {
 
             setPopulationFile(file);
             message.success("Population file loaded successfully");
+            message.destroy()
           },
           error: (error) => {
             console.error("Error parsing population file:", error);
-            message.error("Failed to parse population file");
+            message.error("Failed to parse population file")
           },
         });
       }
