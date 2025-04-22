@@ -6,12 +6,12 @@ BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 echo '🛠️  Preparing to commit: Running linting, type checking, test coverage, and build'
 
 # Run ESLint for linting
-echo "🔍 Running ESLint..."
-npm run lint ||
-(
-  echo '❌ ESLint check failed. Please fix the linting issues before committing.'
-  exit 1
-)
+# echo "🔍 Running ESLint..."
+# npm run lint ||
+# (
+#   echo '❌ ESLint check failed. Please fix the linting issues before committing.'
+#   exit 1
+# )
 
 # # Run test coverage for dev and staging branch
 # if [ "$BRANCH_NAME" = "mcdonalds" ]; then

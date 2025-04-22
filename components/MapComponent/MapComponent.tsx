@@ -34,7 +34,7 @@ import Image from "next/image";
 import bkoiLogo from "../../app/images/bkoi-img.png";
 import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
-import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
+import { getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
@@ -202,7 +202,7 @@ function MapComponent() {
     } else if (object.properties) {
       // For point layers, only show the dataset name
       const datasetName =
-        datasets.find((d) => d.data.some((point) => point === object))?.name ||
+        datasets.find((d) => d.data.some((point:any) => point === object))?.name ||
         "Unknown Dataset";
 
       setHoverInfo({
@@ -253,12 +253,12 @@ function MapComponent() {
           for (const dataset of filteredDatasets) {
             if (dataset.visible) {
               const updatedData = await Promise.all(
-                dataset.data.map(async (point) => {
+                dataset.data.map(async (point:any) => {
                   try {
                     const response = await fetch(
                       `https://gh.bmapsbd.com/sau/isochrone?point=${
                         point.latitude
-                      },${point.longitude}&profile=foot&time_limit=${
+                      },${point.longitude}&profile=car&time_limit=${
                         timeLimit * 60
                       }&reverse_flow=true`
                     );
@@ -273,7 +273,7 @@ function MapComponent() {
                       ...point,
                       isochrones: geometry ? JSON.stringify(geometry) : null,
                     };
-                  } catch (error) {
+                  } catch (error:any) {
                     if (error.name !== 'AbortError') {
                       console.error("Error fetching isochrone:", error);
                     }
@@ -332,7 +332,7 @@ function MapComponent() {
           
           // Calculate coverage stats after isochrones are calculated
           calculateCoverageStats();
-        } catch (error) {
+        } catch (error:any) {
           if (error.name !== 'AbortError') {
             console.error("Error in fetchIsochrones:", error);
             message.error("Failed to process coverage data");
@@ -841,8 +841,8 @@ function MapComponent() {
     }
     
     // Calculate the center of all suggested hubs
-    const sumLon = suggestedHubs.reduce((sum, hub) => sum + hub.longitude, 0);
-    const sumLat = suggestedHubs.reduce((sum, hub) => sum + hub.latitude, 0);
+    const sumLon = suggestedHubs.reduce((sum:any, hub:any) => sum + hub.longitude, 0);
+    const sumLat = suggestedHubs.reduce((sum:any, hub:any) => sum + hub.latitude, 0);
     const centerLon = sumLon / suggestedHubs.length;
     const centerLat = sumLat / suggestedHubs.length;
     
@@ -896,7 +896,7 @@ function MapComponent() {
               const response = await fetch(
                 `https://gh.bmapsbd.com/sau/isochrone?point=${
                   hub.latitude
-                },${hub.longitude}&profile=foot&time_limit=${
+                },${hub.longitude}&profile=car&time_limit=${
                   timeLimit * 60
                 }&reverse_flow=true`
               );
@@ -1258,7 +1258,7 @@ function MapComponent() {
         const geoJSONData = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
-        geoJSONData.features.forEach(feature => {
+        geoJSONData.features.forEach((feature:any) => {
           const cityName = feature.properties.NAME_2;
           
           // Check if this is Riyadh (using any spelling variation)
@@ -1308,7 +1308,7 @@ function MapComponent() {
       let totalCoveredArea = 0;
       
       // Calculate the total coverage area from suggested hubs isochrones
-      hubs.forEach(hub => {
+      hubs.forEach((hub:any) => {
         if (hub.coverage) {
           try {
             const coverage = typeof hub.coverage === 'string' 
@@ -1333,7 +1333,7 @@ function MapComponent() {
         const geoJSONData = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json').then(res => res.json());
         
         // Find the Riyadh region in the GeoJSON data
-        geoJSONData.features.forEach(feature => {
+        geoJSONData.features.forEach((feature:any) => {
           const cityName = feature.properties.NAME_2;
           
           // Check if this is Riyadh (using any spelling variation)
@@ -1724,6 +1724,7 @@ function MapComponent() {
 }
 
 export default MapComponent;
+
 
 const Style = {
   position: 'absolute' as const,

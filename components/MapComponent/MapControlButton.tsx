@@ -1,5 +1,5 @@
-import { Tooltip } from "antd";
-import React from "react";
+import { Tooltip } from 'antd';
+import React from 'react';
 
 interface MapControlButtonProps {
   title: string;
@@ -16,9 +16,9 @@ const MapControlButton: React.FC<MapControlButtonProps> = ({
 }) => {
   return (
     <div>
-      <Tooltip title={title} placement="left">
+      <Tooltip title={ title } placement="left">
         <button
-          onClick={onClick}
+          onClick={ onClick }
           style={{
             padding: "4px 5px",
             backgroundColor: isActive ? "#82CD47" : "#ffffff",
@@ -32,7 +32,7 @@ const MapControlButton: React.FC<MapControlButtonProps> = ({
               "rgba(60, 64, 67, 0.1) 0px 0px 0px 2px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px",
           }}
         >
-          {icon}
+          { icon }
         </button>
       </Tooltip>
     </div>
