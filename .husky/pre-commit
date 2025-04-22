@@ -1,0 +1,37 @@
+# .husky/pre-commit
+# Get the branch name
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+
+# This script runs linting, type checking, and builds before allowing a commit.
+echo '🛠️  Preparing to commit: Running linting, type checking, test coverage, and build'
+
+# Run ESLint for linting
+echo "🔍 Running ESLint..."
+npm run lint ||
+(
+  echo '❌ ESLint check failed. Please fix the linting issues before committing.'
+  exit 1
+)
+
+# # Run test coverage for dev and staging branch
+# if [ "$BRANCH_NAME" = "mcdonalds" ]; then
+#   echo "🧪 Running test coverage..."
+#   npm run test:coverage ||
+#   (
+#     echo '❌ Test coverage failed. Please ensure all tests pass and coverage thresholds are met before committing.'
+#     exit 1
+#   )
+# fi
+
+# Run build only for main branch
+if [ "$BRANCH_NAME" = "mcdonalds" ]; then
+  echo "🏗️  Running build for mcdonalds branch..."
+  npm run build ||
+  (
+    echo '❌ Build failed. Please ensure the build process completes successfully before committing.'
+    exit 1
+  )
+fi
+
+# All checks passed, allow the commit
+echo '✅ All pre-commit checks passed. You may now commit your changes.'
