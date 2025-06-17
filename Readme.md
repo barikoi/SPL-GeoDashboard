@@ -113,6 +113,9 @@ _*See the [System Workflow](system-workflow.md) for more details on the developm
 ## 📚 API Documentation
 See the [Api-Collection](api-collection.md) for full documentation on the API endpoints.
 
+## Deployment Process
+See the [Deployment Guide](deployment-process.md) for instructions on deploying the application.
+
 ## 🤝 Contributing
 
 1. Fork the repository
