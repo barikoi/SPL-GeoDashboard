@@ -624,19 +624,19 @@ const LeftPanel = () => {
     >
       {/* Header Section - more compact */}
       <div className="flex items-center mb-3">
-        <Image
+        {/* <Image
           src={SPL}
           alt="SPL Logo"
           width={32}
           height={0}
           className="w-6 md:w-12 rounded-lg shadow-md"
-        />
+        /> */}
         <h1
           className={`${
             !isNightMode ? "text-gray-900" : "text-gray-100"
           } md:text-lg font-bold ml-2`}
         >
-          GeoDashboard
+          Opportunity Finders
         </h1>
       </div>
 
@@ -674,16 +674,16 @@ const LeftPanel = () => {
             isNightMode ? "text-gray-200" : "text-gray-700"
           }`}
         >
-          Upload Hub Locations
+          Upload Own Points
         </h2>
         {/* For Parcelat Points */}
-        <h3
+        {/* <h3
           className={`text-xs md:text-sm font-semibold mb-2 ${
             isNightMode ? "text-gray-200" : "text-gray-700"
           }`}
         >
-          {`McDonald's Branches`}
-        </h3>
+          {`Own Branches`}
+        </h3> */}
         <input
           type="file"
           accept=".json,.csv"
@@ -901,7 +901,7 @@ const LeftPanel = () => {
               isNightMode ? "text-gray-200" : "text-gray-700"
             }`}
           >
-            Calculate Walkable Coverage <span>({selectedOptionForWalkableCoverage.toUpperCase()})</span>
+            Calculate Walkable Coverage <span>({selectedOptionForWalkableCoverage.toUpperCase() === "PARCELAT" ? "Own" : "Competitor"})</span>
           </h2>
 
           {/* Walking time input and calculate button */}
@@ -1091,7 +1091,7 @@ const LeftPanel = () => {
                   Calculating...
                 </div>
               ) : (!fileUploadedForParcelat || !fileUploadedForCompetitor) ? ( //NOSONAR
-                "Upload Hub Locations"
+                "Upload Own Points"
               ) : !hasCoverageColumn && //NOSONAR
                 !datasets
                   .filter(d => d.uploaded_file_for === selectedOptionForWalkableCoverage.toLowerCase())
@@ -1132,7 +1132,7 @@ const LeftPanel = () => {
             }`}
           >
             <div className="flex items-center justify-center space-x-1.5">
-              <span>Get Suggested Hubs</span>
+              <span>Get Suggested Points</span>
               {isLoadingSuggestions && <Spin size="small" />}
             </div>
           </button>
@@ -1190,7 +1190,7 @@ const LeftPanel = () => {
             }`}
           >
             <div className="flex items-center justify-center space-x-1.5">
-              <span>Get Suggested Hubs Walking Distance</span>
+              <span>Get Suggested Points Walking Distance</span>
               {isFetchingIsochrones && <Spin size="small" />}
             </div>
           </button>

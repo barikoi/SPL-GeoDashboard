@@ -258,7 +258,7 @@ function MapComponent() {
                     const response = await fetch(
                       `https://gh.bmapsbd.com/sau/isochrone?point=${
                         point.latitude
-                      },${point.longitude}&profile=car&time_limit=${
+                      },${point.longitude}&profile=foot&time_limit=${
                         timeLimit * 60
                       }&reverse_flow=true`
                     );
@@ -1203,7 +1203,7 @@ function MapComponent() {
       // Step 4: Update the stats with the total coverage and Riyadh only
       // Create a new stat entry with the current time limit
       const newStat = {
-        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage === "parcelat" ? "own": selectedOptionForWalkableCoverage})`,
         totalArea: regionCoverage["Riyadh"]?.totalArea || 0,
         coveredArea: regionCoverage["Riyadh"]?.coveredArea || 0,
         coveragePercentage: regionCoverage["Riyadh"]?.coveragePercentage || 0,
@@ -1277,7 +1277,7 @@ function MapComponent() {
       
       // Create a new stat entry with the current timestamp
       const newStat = {
-        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage === "parcelat" ? "own": selectedOptionForWalkableCoverage})`,
         totalArea: riyadhArea,
         coveredArea: totalCoveredArea,
         coveragePercentage: coveragePercentage,
@@ -1352,7 +1352,7 @@ function MapComponent() {
       
       // Create a new stat entry with the current timestamp
       const newStat = {
-        provinceName: `Riyadh (${selectedOptionForWalkableCoverage})`,
+        provinceName: `Riyadh (${selectedOptionForWalkableCoverage === "parcelat" ? "own": selectedOptionForWalkableCoverage})`,
         totalArea: riyadhArea,
         coveredArea: totalCoveredArea,
         coveragePercentage: coveragePercentage,
@@ -1646,12 +1646,12 @@ function MapComponent() {
               icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >M</span> }
               isActive={isShowAlMalaz}
             />
-            <MapControlButton
+            {/* <MapControlButton
               title={isShowPOI ? "Hide POI" : "Show POI"}
               onClick={() => dispatch(togglePOIShow())}
               icon={ <span style={{ color: "#333333", padding: "0px 2px"}} >P</span> }
               isActive={isShowPOI}
-            />
+            /> */}
             <MapControlButton
               title="Calculate Coverage"
               onClick={handleCalculateCoverage}

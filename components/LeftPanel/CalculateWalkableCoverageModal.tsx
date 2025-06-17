@@ -44,7 +44,7 @@ const CalculateWalkableCoverageModal = () => {
           onChange={(e) => dispatch(setSelectedOptionForWalkableCoverage(e.target.value))}
           value={selectedOptionForWalkableCoverage}
         >
-          <Radio value="parcelat">Parcelat Points</Radio>
+          <Radio value="parcelat">Own Points</Radio>
           <Radio value="competitor">Competitor Points</Radio>
         </Radio.Group>
       </Modal>
