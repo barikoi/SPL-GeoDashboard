@@ -118,7 +118,7 @@ function MapComponent() {
   // Toggle night and white modes
   const mapStyle = isNightMode
     ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
-    : `https://map.barikoi.com/styles/planet-liberty/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`;
+    : `https://na-maps.vng-solutions.com/styles/spl_desert_v1/style.json`;
   
   // Toggle 2D and 3D mode
   const handleToggle3DMode = () => {
