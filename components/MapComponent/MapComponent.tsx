@@ -117,7 +117,7 @@ function MapComponent() {
 
   // Toggle night and white modes
   const mapStyle = isNightMode
-    ? `https://map.barikoi.com/styles/barikoi-dark-mode/style.json?key=${process.env.NEXT_PUBLIC_BARIKOI_API_KEY}`
+    ? `https://na-maps.vng-solutions.com/styles/spl_dark/style.json`
     : `https://na-maps.vng-solutions.com/styles/spl_bgmaps/style.json`;
   
   // Toggle 2D and 3D mode
@@ -240,6 +240,7 @@ function MapComponent() {
         try {
           // Filter datasets based on uploaded_file_for and selectedOptionForWalkableCoverage
           const filteredDatasets = datasets.filter(dataset => 
+            // @ts-ignore
             dataset.uploaded_file_for === selectedOptionForWalkableCoverage
           );
           for (const dataset of filteredDatasets) {
@@ -953,6 +954,7 @@ function MapComponent() {
 
       if(selectedOptionForWalkableCoverage === "parcelat"){
         datasets
+        // @ts-ignore
           .filter(dataset => dataset.uploaded_file_for === "parcelat")
           .forEach(dataset => {
           if (dataset.visible) {
@@ -1033,6 +1035,7 @@ function MapComponent() {
 
       if(selectedOptionForWalkableCoverage === "competitor"){
         datasets
+        //@ts-ignore
           .filter(dataset => dataset.uploaded_file_for === "competitor")
           .forEach(dataset => {
           if (dataset.visible) {
