@@ -16,3 +16,21 @@
     flex-direction: column;
   }
 }
+
+/* Dark mode disabled select placeholder styling */
+.dark-mode-select.disabled-select .ant-select-selection-placeholder {
+  color: #6b7280 !important;
+}
+
+.dark-mode-select.disabled-select .ant-select-selection-item {
+  color: #6b7280 !important;
+}
+
+/* Light mode disabled select placeholder styling */
+.disabled-select .ant-select-selection-placeholder {
+  color: #9ca3af !important;
+}
+
+.disabled-select .ant-select-selection-item {
+  color: #9ca3af !important;
+}

@@ -45,7 +45,18 @@ interface MapState {
   isGetSuggestedHubsWalkingDistanceButtonClicked: boolean;
   isFetchingIsochrones: boolean;
   isWalkableCoverageModalVisible: boolean;
-  selectedOptionForWalkableCoverage: 'parcelat' | 'competitor'
+  selectedOptionForWalkableCoverage: 'parcelat' | 'competitor';
+  // Filter states
+  selectedCity: string | null;
+  selectedUnitType: string | null;
+  selectedNeighbourhood: string | null;
+  // Neighbourhood polygon state
+  selectedNeighbourhoodPolygon: any | null;
+  // Fly to bounds state
+  neighbourhoodBounds: number[][] | null;
+  // Riyadh city polygon state
+  selectedRiyadhCityPolygon: any | null;
+  riyadhCityBounds: number[][] | null;
 }
 
 const initialState: MapState = {
@@ -68,7 +79,18 @@ const initialState: MapState = {
   isGetSuggestedHubsWalkingDistanceButtonClicked: false,
   isFetchingIsochrones: false,
   isWalkableCoverageModalVisible: false,
-  selectedOptionForWalkableCoverage: 'parcelat'
+  selectedOptionForWalkableCoverage: 'parcelat',
+  // Filter initial states
+  selectedCity: null,
+  selectedUnitType: null,
+  selectedNeighbourhood: null,
+  // Neighbourhood polygon initial state
+  selectedNeighbourhoodPolygon: null,
+  // Fly to bounds initial state
+  neighbourhoodBounds: null,
+  // Riyadh city polygon initial state
+  selectedRiyadhCityPolygon: null,
+  riyadhCityBounds: null
 };
 
 const mapSlice = createSlice({
@@ -185,6 +207,37 @@ const mapSlice = createSlice({
     },
     setSelectedOptionForWalkableCoverage: (state, action) => {
       state.selectedOptionForWalkableCoverage = action.payload; 
+    },
+    // Filter actions
+    setSelectedCity: (state, action: PayloadAction<string | null>) => {
+      state.selectedCity = action.payload;
+    },
+    setSelectedUnitType: (state, action: PayloadAction<string | null>) => {
+      state.selectedUnitType = action.payload;
+    },
+    setSelectedNeighbourhood: (state, action: PayloadAction<string | null>) => {
+      state.selectedNeighbourhood = action.payload;
+    },
+    clearAllFilters: (state) => {
+      state.selectedCity = null;
+      state.selectedUnitType = null;
+      state.selectedNeighbourhood = null;
+      state.selectedNeighbourhoodPolygon = null;
+      state.neighbourhoodBounds = null;
+      state.selectedRiyadhCityPolygon = null;
+      state.riyadhCityBounds = null;
+    },
+    setSelectedNeighbourhoodPolygon: (state, action: PayloadAction<any | null>) => {
+      state.selectedNeighbourhoodPolygon = action.payload;
+    },
+    flyToNeighbourhoodBounds: (state, action: PayloadAction<number[][]>) => {
+      state.neighbourhoodBounds = action.payload;
+    },
+    setSelectedRiyadhCityPolygon: (state, action: PayloadAction<any | null>) => {
+      state.selectedRiyadhCityPolygon = action.payload;
+    },
+    flyToRiyadhCityBounds: (state, action: PayloadAction<number[][]>) => {
+      state.riyadhCityBounds = action.payload;
     }
   },
 });
@@ -215,6 +268,15 @@ export const {
   setIsGetSuggestedHubsWalkingDistanceButtonClicked,
   setIsFetchingIsochrones,
   setIsWalkableCoverageModalVisible,
-  setSelectedOptionForWalkableCoverage
+  setSelectedOptionForWalkableCoverage,
+  // Filter actions
+  setSelectedCity,
+  setSelectedUnitType,
+  setSelectedNeighbourhood,
+  clearAllFilters,
+  setSelectedNeighbourhoodPolygon,
+  flyToNeighbourhoodBounds,
+  setSelectedRiyadhCityPolygon,
+  flyToRiyadhCityBounds
 } = mapSlice.actions;
 export default mapSlice.reducer;

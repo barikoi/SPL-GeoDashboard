@@ -33,12 +33,17 @@ import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
 import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
+import { getNeighbourhoodPolygonByName } from "@/utils/neighbourhoodPolygons";
+import { getRiyadhCityPolygon, getRiyadhCityBounds } from "@/utils/riyadhCityPolygon";
+import riyadhData from "@/app/data/riyadh.json";
 import { TbHexagon3D } from "react-icons/tb";
 import MapControlButton from "./MapControlButton";
 import { FaEye, FaEyeSlash, FaCalculator } from "react-icons/fa";
 import { HeatMapOutlined, BorderOutlined } from "@ant-design/icons";
 import * as turf from '@turf/turf';
 import CoverageStats from "./CoverageStats";
+import MapFilters from "./MapFilters";
+import FilterResults from "./FilterResults";
 import { BASE_URL } from "@/app.config";
 
 const INITIAL_VIEW_STATE = {
@@ -77,6 +82,10 @@ function MapComponent() {
   const isGetSuggestedHubsWalkingDistanceButtonClicked = useSelector((state: RootState) => state.map.isGetSuggestedHubsWalkingDistanceButtonClicked);
   const isFetchingIsochrones = useSelector((state: RootState) => state.map.isFetchingIsochrones);
   const selectedOptionForWalkableCoverage = useSelector((state: RootState) => state.map.selectedOptionForWalkableCoverage);
+  const selectedNeighbourhoodPolygon = useSelector((state: RootState) => state.map.selectedNeighbourhoodPolygon);
+  const neighbourhoodBounds = useSelector((state: RootState) => state.map.neighbourhoodBounds);
+  const selectedRiyadhCityPolygon = useSelector((state: RootState) => state.map.selectedRiyadhCityPolygon);
+  const riyadhCityBounds = useSelector((state: RootState) => state.map.riyadhCityBounds);
 
   // Local States
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
@@ -540,89 +549,164 @@ function MapComponent() {
         }
       })
     ] : []),
-    populationLayerVisible &&
-      // Only show population layer if no suggested hubs
+    // Population layer
+    ...(populationLayerVisible ? 
       (deckglLayer === "Hexgonlayer" ? 
-      [new HexagonLayer({
-        id: "population-hexagon",
-        data: populationPoints,
-        getPosition: (d) => d,
-        radius: 500,
-        elevationScale: 20,
+        [new HexagonLayer({
+          id: "population-hexagon",
+          data: populationPoints,
+          getPosition: (d) => d,
+          radius: 500,
+          elevationScale: 20,
+          pickable: true,
+          extruded: true,
+          colorRange: [
+            [237, 248, 125], // Light Yellow (Low population)
+            [254, 192, 206], // Light Teal
+            [227, 135, 158], // Teal
+            [209, 131, 201], // Medium Dark Blue
+            [139, 95, 191], // Dark Blue
+            [100, 58, 113], // Very Dark Blue (High population)
+          ],
+          coverage: 1,
+          upperPercentile: 100,
+          material: {
+            ambient: 0.64,
+            diffuse: 0.6,
+            shininess: 32,
+            specularColor: [51, 51, 51],
+          },
+          transitions: {
+            elevationScale: 500,
+          },
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 100],
+          // @ts-ignore
+          onHover: (info: any) => {
+            if (info.object) {
+              setHoverInfo({
+                object: info.object,
+                x: info.x,
+                y: info.y,
+                type: "hexagon",
+              });
+            } else {
+              setHoverInfo(null); // Clear hover info when not hovering
+            }
+          },
+        })]:
+        [new HeatmapLayer({
+          id: 'HeatmapLayer',
+          data: populationPoints,
+          aggregation: 'SUM',
+          getPosition: (d: any) => d,
+          getWeight: (d: any) => 10,
+          radiusPixels: 25,
+          pickable: true,
+          colorRange: isNightMode ? [
+            [237, 248, 125], // Light Yellow (Low population)
+            [254, 192, 206], // Light Teal
+            [227, 135, 158], // Teal
+            [209, 131, 201], // Medium Dark Blue
+            [139, 95, 191], // Dark Blue
+            [100, 58, 113], // Very Dark Blue (High population)
+          ] : [
+            [100, 150, 255], // Blue (Low population)
+            [0, 128, 255], // Light Blue
+            [0, 255, 255], // Cyan
+            [255, 0, 0], // Red
+            [255, 0, 128], // Pink
+            [255, 0, 255] // Magenta (High population)
+          ],
+          // @ts-ignore
+          onHover: (info:any) => {
+            if (info.layer.count) {
+              setHoverInfo({
+                object: { count: info.layer.count},
+                x: info.x,
+                y: info.y,
+                type: "HeatmapLayer"
+              });
+            } else {
+              setHoverInfo(null);
+            }
+          }
+        })])
+      : []),
+    // Neighbourhood polygon layer
+    ...(selectedNeighbourhoodPolygon ? [
+      new GeoJsonLayer({
+        id: 'neighbourhood-polygon-layer',
+        data: {
+          type: 'Feature',
+          geometry: selectedNeighbourhoodPolygon.geometry,
+          properties: {
+            name: selectedNeighbourhoodPolygon.name
+          }
+        },
+        getFillColor: isNightMode ? [255, 165, 0, 80] : [255, 140, 0, 80], // Orange color with transparency
+        getLineColor: isNightMode ? [255, 69, 0, 255] : [255, 69, 0, 255], // Deep orange border
+        getLineWidth: 20,
         pickable: true,
-        extruded: true,
-        colorRange: [
-          [237, 248, 125], // Light Yellow (Low population)
-          [254, 192, 206], // Light Teal
-          [227, 135, 158], // Teal
-          [209, 131, 201], // Medium Dark Blue
-          [139, 95, 191], // Dark Blue
-          [100, 58, 113], // Very Dark Blue (High population)
-        ],
-        coverage: 1,
-        upperPercentile: 100,
-        material: {
-          ambient: 0.64,
-          diffuse: 0.6,
-          shininess: 32,
-          specularColor: [51, 51, 51],
-        },
-        transitions: {
-          elevationScale: 500,
-        },
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 100],
-        // @ts-ignore
+        stroked: true,
+        filled: true,
+        wireframe: false,
         onHover: (info: any) => {
           if (info.object) {
             setHoverInfo({
-              object: info.object,
+              object: {
+                properties: {
+                  name: info.object.properties.name,
+                  type: "Neighbourhood"
+                }
+              },
               x: info.x,
               y: info.y,
-              type: "hexagon",
-            });
-          } else {
-            setHoverInfo(null); // Clear hover info when not hovering
-          }
-        },
-      })]:
-      [new HeatmapLayer({
-        id: 'HeatmapLayer',
-        data: populationPoints,
-        aggregation: 'SUM',
-        getPosition: (d: any) => d,
-        getWeight: (d: any) => 10,
-        radiusPixels: 25,
-        pickable: true,
-        colorRange: isNightMode ? [
-          [237, 248, 125], // Light Yellow (Low population)
-          [254, 192, 206], // Light Teal
-          [227, 135, 158], // Teal
-          [209, 131, 201], // Medium Dark Blue
-          [139, 95, 191], // Dark Blue
-          [100, 58, 113], // Very Dark Blue (High population)
-        ] : [
-          [100, 150, 255], // Blue (Low population)
-          [0, 128, 255], // Light Blue
-          [0, 255, 255], // Cyan
-          [255, 0, 0], // Red
-          [255, 0, 128], // Pink
-          [255, 0, 255] // Magenta (High population)
-        ],
-        // @ts-ignore
-        onHover: (info:any) => {
-          if (info.layer.count) {
-            setHoverInfo({
-              object: { count: info.layer.count},
-              x: info.x,
-              y: info.y,
-              type: "HeatmapLayer"
+              type: "neighbourhood"
             });
           } else {
             setHoverInfo(null);
           }
         }
-      })])
+      })
+    ] : []),
+    // Riyadh city polygon layer
+    ...(selectedRiyadhCityPolygon ? [
+      new GeoJsonLayer({
+        id: 'riyadh-city-polygon-layer',
+        data: {
+          type: 'Feature',
+          geometry: selectedRiyadhCityPolygon.geometry,
+          properties: {
+            name: selectedRiyadhCityPolygon.name
+          }
+        },
+        getFillColor: [0, 0, 0, 0], // Transparent fill (no fill color)
+        getLineColor: isNightMode ? [255, 69, 0, 255] : [255, 69, 0, 255], // Deep orange border
+        getLineWidth: 100,
+        pickable: true,
+        stroked: true,
+        filled: false, // Disable fill
+        wireframe: false,
+        onHover: (info: any) => {
+          if (info.object) {
+            setHoverInfo({
+              object: {
+                properties: {
+                  name: info.object.properties.name,
+                  type: "Riyadh City"
+                }
+              },
+              x: info.x,
+              y: info.y,
+              type: "riyadh-city"
+            });
+          } else {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : [])
   ].filter(Boolean);
 
   // Update the flyToHighestDensityArea function with proper typing
@@ -788,6 +872,77 @@ function MapComponent() {
     calculateSuggestedHubStats();
     
   }, [suggestedHubs]);
+
+  // Fly to neighbourhood bounds when selected
+  useEffect(() => {
+    if (neighbourhoodBounds && mapRef.current) {
+      try {
+        const [[minLng, minLat], [maxLng, maxLat]] = neighbourhoodBounds;
+        
+        // Calculate center and zoom level
+        const centerLng = (minLng + maxLng) / 2;
+        const centerLat = (minLat + maxLat) / 2;
+        
+        // Calculate appropriate zoom level based on bounds size
+        const latDiff = maxLat - minLat;
+        const lngDiff = maxLng - minLng;
+        const maxDiff = Math.max(latDiff, lngDiff);
+        
+        // Calculate zoom level (inverse relationship with bounds size)
+        let zoom = 14; // Default zoom
+        if (maxDiff > 0.1) zoom = 10;
+        else if (maxDiff > 0.05) zoom = 11;
+        else if (maxDiff > 0.02) zoom = 12;
+        else if (maxDiff > 0.01) zoom = 13;
+        else if (maxDiff > 0.005) zoom = 14;
+        else zoom = 15;
+        
+        mapRef.current.flyTo({
+          center: [centerLng, centerLat],
+          zoom: zoom,
+          duration: 2000,
+          essential: true
+        });
+      } catch (error) {
+        console.error("Error during flyTo neighbourhood:", error);
+      }
+    }
+  }, [neighbourhoodBounds]);
+
+  // Fly to Riyadh city bounds when selected
+  useEffect(() => {
+    if (riyadhCityBounds && mapRef.current) {
+      try {
+        const [[minLng, minLat], [maxLng, maxLat]] = riyadhCityBounds;
+        
+        // Calculate center and zoom level
+        const centerLng = (minLng + maxLng) / 2;
+        const centerLat = (minLat + maxLat) / 2;
+        
+        // Calculate appropriate zoom level based on bounds size
+        const latDiff = maxLat - minLat;
+        const lngDiff = maxLng - minLng;
+        const maxDiff = Math.max(latDiff, lngDiff);
+        
+        // Calculate zoom level for city (wider view)
+        let zoom = 9; // Default zoom for city
+        if (maxDiff > 0.5) zoom = 7;
+        else if (maxDiff > 0.3) zoom = 8;
+        else if (maxDiff > 0.2) zoom = 9;
+        else if (maxDiff > 0.1) zoom = 10;
+        else zoom = 11;
+        
+        mapRef.current.flyTo({
+          center: [centerLng, centerLat],
+          zoom: zoom,
+          duration: 2000,
+          essential: true
+        });
+      } catch (error) {
+        console.error("Error during flyTo Riyadh city:", error);
+      }
+    }
+  }, [riyadhCityBounds]);
 
   useEffect(() => {
     // Skip if there are no hubs or already fetching
@@ -1337,18 +1492,10 @@ function MapComponent() {
 
   // Load Riyadh city data
   useEffect(() => {
-    const loadRiyadhCityData = async () => {
-      try {
-        const response = await fetch('https://gist.githubusercontent.com/sarikamahboob/e268073d9415344faa00f043b5ebf58c/raw/90a5293be0aeab58db2cd6d4a5f7952acb97ee53/riyadh_city.json');
-        const data = await response.json();
-        setRiyadhCityData(data);
-      } catch (error) {
-        console.error('Error loading Riyadh city data:', error);
-      }
-    };
-
-    loadRiyadhCityData();
-  }, [])
+    if (riyadhData && (riyadhData as any).features) {
+      setRiyadhCityData(riyadhData);
+    }
+  }, [setRiyadhCityData]);
 
   // Create a function to add the grid layer
   const addAridGridLayer = () => {
@@ -1427,6 +1574,12 @@ function MapComponent() {
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
+      {/* Map Filters */}
+      <MapFilters isNightMode={isNightMode} />
+      
+      {/* Filter Results */}
+      <FilterResults isNightMode={isNightMode} />
+      
       {/* <DeckGL 
         // @ts-ignore
         initialViewState={INITIAL_VIEW_STATE} 
@@ -1532,6 +1685,15 @@ function MapComponent() {
               </div>
               <div>
                 <strong>Count:</strong> {hoverInfo.object.count} points
+              </div>
+            </div>
+          ) : hoverInfo.type === "neighbourhood" ? (
+            <div className="space-y-1">
+              <div className="font-semibold text-gray-800">
+                Neighbourhood
+              </div>
+              <div>
+                <strong>Name:</strong> {hoverInfo.object?.properties?.name}
               </div>
             </div>
           ) : (

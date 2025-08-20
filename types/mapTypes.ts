@@ -27,5 +27,5 @@ export interface HoverInfo {
   object: any;
   x: number;
   y: number;
-  type: "point" | "hexagon" | "suggested" | "HeatmapLayer";
+  type: "point" | "hexagon" | "suggested" | "HeatmapLayer" | "neighbourhood" | "riyadh-city" | "province";
 }
