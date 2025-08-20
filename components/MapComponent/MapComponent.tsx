@@ -925,12 +925,12 @@ function MapComponent() {
         const maxDiff = Math.max(latDiff, lngDiff);
         
         // Calculate zoom level for city (wider view)
-        let zoom = 9; // Default zoom for city
-        if (maxDiff > 0.5) zoom = 7;
-        else if (maxDiff > 0.3) zoom = 8;
-        else if (maxDiff > 0.2) zoom = 9;
-        else if (maxDiff > 0.1) zoom = 10;
-        else zoom = 11;
+        let zoom = 11; // Default zoom for city
+        if (maxDiff > 0.5) zoom = 9;
+        else if (maxDiff > 0.3) zoom = 10;
+        else if (maxDiff > 0.2) zoom = 11;
+        else if (maxDiff > 0.1) zoom = 12;
+        else zoom = 13;
         
         mapRef.current.flyTo({
           center: [centerLng, centerLat],
