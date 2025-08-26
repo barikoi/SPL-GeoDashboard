@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { setSelectedCity, setSelectedUnitType, setSelectedNeighbourhood, clearAllFilters, setSelectedNeighbourhoodPolygon, flyToNeighbourhoodBounds, setSelectedRiyadhCityPolygon, flyToRiyadhCityBounds } from '@/store/mapSlice';
 import { getFilterOptions, getDependentFilterOptions } from '@/utils/filterData';
-import { getNeighbourhoodPolygonByName } from '@/utils/neighbourhoodPolygons';
+import { getNeighbourhoodPolygonsByName } from '@/utils/neighbourhoodPolygons';
 import { getRiyadhCityPolygon, getRiyadhCityBounds } from '@/utils/riyadhCityPolygon';
 
 const { Option } = Select;
@@ -60,23 +60,29 @@ const MapFilters: React.FC<MapFiltersProps> = ({ isNightMode = false }) => {
     // Clear unit type when neighbourhood changes
     dispatch(setSelectedUnitType(null));
     
-    // Set neighbourhood polygon if neighbourhood is selected
+    // Set neighbourhood polygons if neighbourhood is selected
     if (value) {
-      const polygon = getNeighbourhoodPolygonByName(value);
-      dispatch(setSelectedNeighbourhoodPolygon(polygon));
+      const polygons = getNeighbourhoodPolygonsByName(value);
+      // For now, we'll use the first polygon for the Redux state (keeping backward compatibility)
+      // The MapComponent will handle multiple polygons
+      dispatch(setSelectedNeighbourhoodPolygon(polygons.length > 0 ? polygons[0] : null));
       
-      // Fly to neighbourhood bounds
-      if (polygon && polygon.geometry) {
-        // Calculate bounds from polygon coordinates
-        const coordinates = polygon.geometry.coordinates[0]; // Get the first ring of the polygon
+      // Fly to neighbourhood bounds (calculate bounds from all polygons)
+      if (polygons.length > 0) {
         let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
         
-        coordinates.forEach((coord: number[]) => {
-          const [lng, lat] = coord;
-          minLng = Math.min(minLng, lng);
-          maxLng = Math.max(maxLng, lng);
-          minLat = Math.min(minLat, lat);
-          maxLat = Math.max(maxLat, lat);
+        // Calculate bounds from all polygons
+        polygons.forEach(polygon => {
+          if (polygon.geometry && polygon.geometry.coordinates) {
+            const coordinates = polygon.geometry.coordinates[0]; // Get the first ring of the polygon
+            coordinates.forEach((coord: number[]) => {
+              const [lng, lat] = coord;
+              minLng = Math.min(minLng, lng);
+              maxLng = Math.max(maxLng, lng);
+              minLat = Math.min(minLat, lat);
+              maxLat = Math.max(maxLat, lat);
+            });
+          }
         });
         
         // Add some padding to the bounds

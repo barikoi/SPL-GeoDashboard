@@ -33,7 +33,7 @@ import { PickingInfo } from "@deck.gl/core";
 import Papa from "papaparse";
 import { getRandomColor, getSequentialColor, transformIsochroneToGeometry } from "@/utils/localUtils";
 import { IsochroneData, PopulationPoint, HoverInfo, DataPoint } from "@/types/mapTypes";
-import { getNeighbourhoodPolygonByName } from "@/utils/neighbourhoodPolygons";
+import { getNeighbourhoodPolygonsByName } from "@/utils/neighbourhoodPolygons";
 import { getRiyadhCityPolygon, getRiyadhCityBounds } from "@/utils/riyadhCityPolygon";
 import riyadhData from "@/app/data/riyadh.json";
 import { TbHexagon3D } from "react-icons/tb";
@@ -633,43 +633,67 @@ function MapComponent() {
           }
         })])
       : []),
-    // Neighbourhood polygon layer
-    ...(selectedNeighbourhoodPolygon ? [
-      new GeoJsonLayer({
-        id: 'neighbourhood-polygon-layer',
-        data: {
-          type: 'Feature',
-          geometry: selectedNeighbourhoodPolygon.geometry,
-          properties: {
-            name: selectedNeighbourhoodPolygon.name
-          }
-        },
-        getFillColor: isNightMode ? [255, 165, 0, 80] : [255, 140, 0, 80], // Orange color with transparency
-        getLineColor: isNightMode ? [255, 69, 0, 255] : [255, 69, 0, 255], // Deep orange border
-        getLineWidth: 20,
-        pickable: true,
-        stroked: true,
-        filled: true,
-        wireframe: false,
-        onHover: (info: any) => {
-          if (info.object) {
-            setHoverInfo({
-              object: {
-                properties: {
-                  name: info.object.properties.name,
-                  type: "Neighbourhood"
-                }
-              },
-              x: info.x,
-              y: info.y,
-              type: "neighbourhood"
-            });
-          } else {
-            setHoverInfo(null);
-          }
+    // Neighbourhood polygon layers (handle multiple polygons for same neighbourhood)
+    ...(selectedNeighbourhoodPolygon ? (() => {
+      const neighbourhoodName = selectedNeighbourhoodPolygon.name;
+      const allPolygons = getNeighbourhoodPolygonsByName(neighbourhoodName);
+      
+      return allPolygons.map((polygon, index) => {
+        // Different colors for first polygon of Qurtubah and Sedra
+        const isFirstPolygon = index === 0;
+        const isQurtubahOrSedra = neighbourhoodName === 'Qurtubah' || neighbourhoodName === 'Sedra';
+        
+        // Define colors based on polygon position and neighbourhood
+        let fillColor, lineColor;
+        
+        if (isFirstPolygon && isQurtubahOrSedra) {
+          // First polygon of Qurtubah or Sedra - use blue colors
+          fillColor = isNightMode ? [30, 144, 255, 80] : [30, 144, 255, 80]; // Dodger blue with transparency
+          lineColor = isNightMode ? [0, 100, 200, 255] : [0, 100, 200, 255]; // Darker blue border
+        } else {
+          // Other polygons - use orange colors (original)
+          fillColor = isNightMode ? [255, 165, 0, 80] : [255, 140, 0, 80]; // Orange color with transparency
+          lineColor = isNightMode ? [255, 69, 0, 255] : [255, 69, 0, 255]; // Deep orange border
         }
-      })
-    ] : []),
+        
+        return new GeoJsonLayer({
+          id: `neighbourhood-polygon-layer-${index}`,
+          data: {
+            type: 'Feature',
+            geometry: polygon.geometry,
+            properties: {
+              name: polygon.name,
+              district: polygon.district || ''
+            }
+          } as any,
+          getFillColor: fillColor,
+          getLineColor: lineColor,
+          getLineWidth: 20,
+          pickable: true,
+          stroked: true,
+          filled: true,
+          wireframe: false,
+          onHover: (info: any) => {
+            if (info.object) {
+              setHoverInfo({
+                object: {
+                  properties: {
+                    name: info.object.properties.name,
+                    district: info.object.properties.district,
+                    type: "Neighbourhood"
+                  }
+                },
+                x: info.x,
+                y: info.y,
+                type: "neighbourhood"
+              });
+            } else {
+              setHoverInfo(null);
+            }
+          }
+        });
+      });
+    })() : []),
     // Riyadh city polygon layer
     ...(selectedRiyadhCityPolygon ? [
       new GeoJsonLayer({
@@ -1695,6 +1719,11 @@ function MapComponent() {
               <div>
                 <strong>Name:</strong> {hoverInfo.object?.properties?.name}
               </div>
+              {hoverInfo.object?.properties?.district && (
+                <div>
+                  <strong>District:</strong> {hoverInfo.object?.properties?.district}
+                </div>
+              )}
             </div>
           ) : (
             <div className="font-medium text-gray-800">
