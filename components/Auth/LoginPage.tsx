@@ -17,8 +17,8 @@ const LoginPage: React.FC = () => {
   const { isLoading, error } = useAuthPersistence();
 
   // Static credentials
-  const VALID_EMAIL = 'spl@gmail.com';
-  const VALID_PASSWORD = 'spl@123';
+  const VALID_EMAIL = 'geodash@spl.com';
+  const VALID_PASSWORD = 'geodashspl2025';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
