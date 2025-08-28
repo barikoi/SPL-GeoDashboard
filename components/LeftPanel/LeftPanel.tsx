@@ -20,6 +20,8 @@ import {
   setIsGetSuggestedHubsWalkingDistanceButtonClicked,
   setIsWalkableCoverageModalVisible
 } from "@/store/mapSlice";
+import { logout } from "@/store/authSlice";
+import { useAuthPersistence } from "@/hooks/useAuthPersistence";
 import { RootState } from "@/store/store";
 import {
   FaTrash,
@@ -31,8 +33,8 @@ import {
 import * as Papa from "papaparse";
 import Image from "next/image";
 import SPL from "../../app/images/SPL_Logo.webp";
-import { Progress, message, Spin, Tooltip, Switch, Radio, Input } from "antd";
-import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined } from "@ant-design/icons";
+import { Progress, message, Spin, Tooltip, Switch, Radio, Input, Button } from "antd";
+import { EyeFilled, EyeInvisibleFilled, EyeOutlined, UploadOutlined, LogoutOutlined } from "@ant-design/icons";
 import { DataPoint } from "@/types/leftPanelTypes";
 import { getRandomColor, normalizeData } from "@/utils/localUtils";
 import CalculateWalkableCoverageModal from "./CalculateWalkableCoverageModal";
@@ -64,6 +66,9 @@ const downloadCSV = (dataset: {
 
 const LeftPanel = () => {
   const dispatch = useDispatch();
+  
+  // Auth persistence hook
+  useAuthPersistence();
 
   // Local States
   // const [fileUploaded, setFileUploaded] = useState(false);
@@ -102,6 +107,10 @@ const LeftPanel = () => {
 
   const handleToggleMapStyle = (checked: boolean) => {
     dispatch(toggleNightMode()); // Dispatch the action to toggle night mode
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
   };
 
   const checkForCoverageColumn = (data: any[]): boolean => {
@@ -596,21 +605,33 @@ const LeftPanel = () => {
       }`}
     >
       {/* Header Section - more compact */}
-      <div className="flex items-center mb-3">
-        <Image
-          src={SPL}
-          alt="SPL Logo"
-          width={32}
-          height={0}
-          className="w-6 md:w-12 rounded-lg shadow-md"
-        />
-        <h1
-          className={`${
-            !isNightMode ? "text-gray-900" : "text-gray-100"
-          } md:text-lg font-bold ml-2`}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center">
+          <Image
+            src={SPL}
+            alt="SPL Logo"
+            width={32}
+            height={0}
+            className="w-6 md:w-12 rounded-lg shadow-md"
+          />
+          <h1
+            className={`${
+              !isNightMode ? "text-gray-900" : "text-gray-100"
+            } md:text-sm font-bold ml-2`}
+          >
+            GeoDashboard
+          </h1>
+        </div>
+        <Button
+          type="primary"
+          danger
+          size="small"
+          icon={<LogoutOutlined />}
+          onClick={handleLogout}
+          className="shadow-sm"
         >
-          GeoDashboard
-        </h1>
+          Logout
+        </Button>
       </div>
 
       {/* Night Mode Toggle Button */}

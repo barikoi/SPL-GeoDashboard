@@ -71,11 +71,11 @@ const FilterResults: React.FC<FilterResultsProps> = ({ isNightMode = false }) =>
     <Card
       style={{
         position: 'absolute',
-        top: 120,
+        top: 172,
         left: 10,
         zIndex: 1000,
         width: 250,
-        maxHeight: '80vh',
+        maxHeight: '68vh',
         backgroundColor: isNightMode ? '#1f2937' : '#ffffff',
         border: isNightMode ? '1px solid #374151' : '1px solid #d1d5db',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',

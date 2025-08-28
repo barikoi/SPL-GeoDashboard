@@ -108,7 +108,7 @@ const MapFilters: React.FC<MapFiltersProps> = ({ isNightMode = false }) => {
     <Card
       style={{
         position: 'absolute',
-        top: 10,
+        top: 60,
         left: 310,
         transform: 'translateX(-50%)',
         zIndex: 1000,

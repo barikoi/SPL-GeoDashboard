@@ -10,7 +10,7 @@ import {
   NavigationControl,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer } from "deck.gl";
+import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer, IconLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
@@ -45,6 +45,8 @@ import CoverageStats from "./CoverageStats";
 import MapFilters from "./MapFilters";
 import FilterResults from "./FilterResults";
 import { BASE_URL } from "@/app.config";
+import SearchBar from "./SearchBar";
+import splLogo from "../../app/images/spl_logo.png";
 
 const INITIAL_VIEW_STATE = {
   longitude: 46.7941,
@@ -123,6 +125,12 @@ function MapComponent() {
   }>>([]);
   const [riyadhCityData, setRiyadhCityData] = useState<any>(null);
   const [isShowAridGrid, setIsShowAridGrid] = useState(false);
+
+  // Search-related states
+  const [searchPolygon, setSearchPolygon] = useState<any>(null);
+  const [searchLocationInfo, setSearchLocationInfo] = useState<any>(null);
+  const [searchMarker, setSearchMarker] = useState<any>(null);
+  const [popupPosition, setPopupPosition] = useState<[number, number] | null>(null);
 
   // Toggle night and white modes
   const mapStyle = isNightMode
@@ -726,6 +734,85 @@ function MapComponent() {
               type: "riyadh-city"
             });
           } else {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : []),
+    // Search polygon layer
+    ...(searchPolygon ? [
+      new GeoJsonLayer({
+        id: 'search-polygon-layer',
+        data: {
+          type: 'FeatureCollection',
+          features: [searchPolygon]
+        },
+        pickable: true,
+        stroked: true,
+        filled: true,
+        extruded: false,
+        lineWidthScale: 2,
+        lineWidthMinPixels: 2,
+        getFillColor: [173, 216, 230, 120], // Light blue with opacity
+        getLineColor: [0, 0, 139, 255],     // Deep solid blue outline
+        getLineWidth: 5,
+        visible: true,
+        opacity: 1,
+        zIndex: 1000,
+        updateTriggers: {
+          getData: [searchPolygon]
+        },
+        onHover: (info: any) => {
+          if (info.object && info.object.properties) {
+            setHoverInfo({
+              object: {
+                properties: {
+                  name: info.object.properties.name,
+                  address: info.object.properties.address,
+                  country: info.object.properties.country
+                }
+              },
+              x: info.x,
+              y: info.y,
+              type: "search-polygon"
+            });
+          } else if (!info.object) {
+            setHoverInfo(null);
+          }
+        }
+      })
+    ] : []),
+    ...(searchMarker ? [
+      new IconLayer({
+        id: 'search-result',
+        data: [searchMarker],
+        pickable: true,
+        getIcon: () => ({
+          url: `${splLogo.src}`,
+          width: 200,
+          height: 270,
+          anchorY: 270
+        }),
+        sizeScale: 15,
+        getPosition: (d: any) => d.coordinates,
+        getSize: () => 5,
+        getColor: [255, 0, 0, 255], // Red color
+        zIndex: 1001, // Higher than polygon to show on top
+        updateTriggers: {
+          getPosition: [searchMarker],
+          getColor: [searchMarker]
+        },
+        onHover: (info: any) => {
+          if (info.object && info.object.properties) {
+            setHoverInfo({
+              object: {
+                properties: info.object.properties
+              },
+              x: info.x,
+              y: info.y,
+              type: "search-result"
+            });
+          } else if (!info.object) {
             setHoverInfo(null);
           }
         }
@@ -1583,21 +1670,148 @@ function MapComponent() {
     setIsShowAridGrid(prev => !prev);
   };
 
-  // Add useEffect to respond to isShowAridGrid changes
-  // useEffect(() => {
-  //   if (mapRef.current && mapRef.current.getMap()) {
-  //     const map = mapRef.current.getMap();
+  const handleLocationSelect = (location: any) => {
+    
+    // Set the search marker based on location data
+    if (location.location && Array.isArray(location.location) && location.location.length === 2) {
+      // location.location is in [lat, lng] format, convert to [lng, lat] for the marker
+      const markerCoordinates: [number, number] = [location.location[1], location.location[0]];
       
-  //     if (map.isStyleLoaded()) {
-  //       addAridGridLayer();
-  //     } else {
-  //       map.once('style.load', addAridGridLayer);
-  //     }
-  //   }
-  // }, [isShowAridGrid]); // Re-run when isShowAridGrid changes
+      setSearchMarker({
+        coordinates: markerCoordinates,
+        properties: {
+          name: location.name,
+          address: location.address,
+          country: location.country,
+          type: location.type || 'search'
+        }
+      });
+      
+      // Fly to the marker coordinates (already in [lng, lat] format)
+      if (flyToLocation) {
+        flyToLocation(markerCoordinates, 14);
+      }
+      
+    } else if (location.longitude && location.latitude) {
+      // Fallback to longitude/latitude properties
+      const markerCoordinates: [number, number] = [location.longitude, location.latitude];
+      
+      setSearchMarker({
+        coordinates: markerCoordinates,
+        properties: {
+          name: location.name,
+          address: location.address,
+          country: location.country,
+          type: location.type || 'search'
+        }
+      });
+      
+      // Fly to the marker coordinates
+      if (flyToLocation) {
+        flyToLocation(markerCoordinates, 14);
+      }
+    }
+  };
+
+  // Handle clearing search results (markers and polygons)
+  const handleClearSearch = () => {
+    setPopupPosition(null);
+    setSearchMarker(null);
+    setSearchPolygon(null);
+    
+    // Remove any search-related layers from the map
+    if (mapRef.current) {
+      const map = mapRef.current.getMap();
+      // Remove any search marker layers if they exist
+      if (map.getLayer('search-result')) {
+        map.removeLayer('search-result');
+      }
+      if (map.getSource('search-result')) {
+        map.removeSource('search-result');
+      }
+      // Remove any search polygon layers if they exist
+      if (map.getLayer('search-polygon')) {
+        map.removeLayer('search-polygon');
+      }
+      if (map.getSource('search-polygon')) {
+        map.removeSource('search-polygon');
+      }
+    }
+  };
+
+  const showPolygon = (geojson: any, locationInfo: any) => {
+    
+    if (Array.isArray(geojson) && geojson.length > 0 && Array.isArray(geojson[0])) {
+      // Case 1: geojson is an array of coordinates - need to swap from [lat, lng] to [lng, lat]
+      
+      // Swap coordinates from [lat, lng] to [lng, lat] for GeoJSON format
+      const swappedCoords = geojson.map(coord => [coord[1], coord[0]]);
+      
+      const polygonFeature = {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [swappedCoords]
+        },
+        properties: {
+          name: locationInfo.name,
+          address: locationInfo.address,
+          country: locationInfo.country
+        }
+      };
+      
+      setSearchPolygon(polygonFeature);
+      
+    } else if (typeof geojson === 'object' && geojson.type === 'Feature') {
+      // Case 2: geojson is already a GeoJSON feature
+      setSearchPolygon(geojson);
+      
+    } else if (Array.isArray(geojson) && geojson.length === 2 && typeof geojson[0] === 'number') {
+      // Case 3: geojson is a point coordinate - swap from [lat, lng] to [lng, lat]
+      const coords = [geojson[1], geojson[0]]; 
+      
+      const pointFeature = {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: coords
+        },
+        properties: {
+          name: locationInfo.name,
+          address: locationInfo.address,
+          country: locationInfo.country
+        }
+      };
+      
+      setSearchPolygon(pointFeature);
+    } else {
+      setSearchPolygon([]);
+      console.warn('Unknown geojson format:', geojson);
+    }
+    
+    setSearchLocationInfo(locationInfo);
+  };
+
+  const flyToLocation = (coordinates: [number, number], zoom: number = 14) => {
+    const map = mapRef.current;
+    if (map) {
+      map.flyTo({
+        center: coordinates,
+        zoom: zoom,
+        duration: 2000,
+        essential: true
+      });
+    }
+  };
 
   return (
     <div className="relative w-full md:w-[78vw] h-[70vh] md:h-screen">
+      <SearchBar
+        onLocationSelect={handleLocationSelect}
+        showPolygon={showPolygon}
+        flyToLocation={flyToLocation}
+        onClear={handleClearSearch}
+      />
       {/* Map Filters */}
       <MapFilters isNightMode={isNightMode} />
       
@@ -1723,6 +1937,16 @@ function MapComponent() {
                 <div>
                   <strong>District:</strong> {hoverInfo.object?.properties?.district}
                 </div>
+              )}
+            </div>
+          ) : (hoverInfo.type === "search-polygon") ? (
+            <div className="space-y-1">
+              <div className="font-semibold text-gray-800">{hoverInfo.object.properties.name}</div>
+              {hoverInfo.object.properties.address && (
+                <div><strong>Address:</strong> {hoverInfo.object.properties.address}</div>
+              )}
+              {hoverInfo.object.properties.country && (
+                <div><strong>Country:</strong> {hoverInfo.object.properties.country}</div>
               )}
             </div>
           ) : (

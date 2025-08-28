@@ -34,3 +34,9 @@
 .disabled-select .ant-select-selection-item {
   color: #9ca3af !important;
 }
+
+
+.search-bar .ant-select-selection-placeholder{
+  padding-left: 30px !important;
+  padding-top: 5px !important;
+}
