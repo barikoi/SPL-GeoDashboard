@@ -69,7 +69,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           },
           headers: {
             'accept': 'application/json',
-            'X-API-KEY': `${process.env.NEXT_PUBLIC_AUTOCOMPLETE_API_KEY}`,
+            'X-API-KEY': process.env.NEXT_PUBLIC_AUTOCOMPLETE_API_KEY || '',
           },
         }
       );
