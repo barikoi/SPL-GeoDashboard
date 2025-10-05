@@ -11,14 +11,15 @@ const { Title, Text } = Typography;
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   const dispatch = useDispatch();
   const { isLoading, error } = useAuthPersistence();
 
   // Static credentials
-  const VALID_EMAIL = 'geodash@spl.com';
-  const VALID_PASSWORD = 'geodashspl2025';
+  const VALID_CREDENTIALS = [
+    { email: 'geodash@spl.com', password: 'geodashspl2025' },
+    { email: 'Rnmotmi@splonline.com.sa', password: 'raghadspl2025' }
+  ];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +33,10 @@ const LoginPage: React.FC = () => {
 
     // Simulate API call delay
     setTimeout(() => {
-      if (email === VALID_EMAIL && password === VALID_PASSWORD) {
+      const isValid = VALID_CREDENTIALS.some(
+        cred => cred.email === email && cred.password === password
+      );
+      if (isValid) {
         dispatch(loginSuccess());
       } else {
         dispatch(loginFailure('Invalid email or password'));
@@ -132,4 +136,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage; 
+export default LoginPage;
