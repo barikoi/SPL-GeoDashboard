@@ -889,7 +889,7 @@ function MapComponent() {
         } 
       }, 500);
     } else {
-      console.log("No dense cell found in the dataset");
+      console.error("No dense cell found in the dataset");
     }
   };
 
@@ -1659,7 +1659,6 @@ function MapComponent() {
         });
       }
       
-      console.log(`Arid grid layer ${isShowAridGrid ? 'shown' : 'hidden'} successfully`);
     } catch (error) {
       console.error("Error toggling arid grid layer:", error);
     }

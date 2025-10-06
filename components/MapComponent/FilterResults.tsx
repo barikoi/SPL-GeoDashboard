@@ -65,8 +65,6 @@ const FilterResults: React.FC<FilterResultsProps> = ({ isNightMode = false }) =>
     return null;
   }
 
-  console.log({totalTransactionAmountSAR, totalTransactions})
-
   return (
     <Card
       style={{
