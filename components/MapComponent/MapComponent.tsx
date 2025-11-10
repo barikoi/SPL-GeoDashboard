@@ -1888,12 +1888,12 @@ function MapComponent() {
               icon={<FaCalculator color="#333333" />}
               isActive={showCoverageStats}
             />
-            <MapControlButton
+            {/* <MapControlButton
               title={isShowAridGrid ? "Hide Grid" : "Show Grid"}
               onClick={toggleAridGrid}
               icon={<span style={{ color: "#333333" }}>Grid</span>}
               isActive={isShowAridGrid}
-            /> 
+            />  */}
             <CoverageStats
               showCoverageStats={showCoverageStats}
               coverageStats={coverageStats}
