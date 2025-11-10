@@ -6,7 +6,7 @@ on:
 
 env: 
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PAT }}
   SSH_HOST: ${{ secrets.SSH_HOST }}
   SSH_USER: ${{ secrets.SSH_USER }}
   SSH_KEY: ${{ secrets.SSH_KEY }}

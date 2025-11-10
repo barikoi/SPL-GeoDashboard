@@ -6,7 +6,7 @@ on:
 
 env: 
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PAT }}
   DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
 jobs:

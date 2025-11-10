@@ -9,8 +9,9 @@ import {
   FullscreenControl,
   NavigationControl,
 } from "react-map-gl/maplibre";
+import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import DeckGL, { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer, IconLayer } from "deck.gl";
+import { ScatterplotLayer, GeoJsonLayer, DeckProps, HeatmapLayer, IconLayer } from "deck.gl";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { HexagonLayer } from "@deck.gl/aggregation-layers";
@@ -145,6 +146,21 @@ function MapComponent() {
       map.setPitch(is3DMode ? 60 : 0);
     }
   }
+
+  // Load RTL text plugin for Arabic text support
+  useEffect(() => {
+    const rtlStatus = maplibregl.getRTLTextPluginStatus ? maplibregl.getRTLTextPluginStatus() : 'unavailable';
+    if (rtlStatus === 'unavailable') {
+      try {
+        maplibregl.setRTLTextPlugin(
+          'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js',
+          true
+        );
+      } catch (error) {
+        console.error('Error loading RTL text plugin:', error);
+      }
+    }
+  }, []); 
 
   // Function to merge city polygons into province polygons
   const mergeProvincePolygons = (data: any) => {
@@ -902,7 +918,7 @@ function MapComponent() {
       const map = mapRef.current.getMap();
       
       // List of building layers to toggle
-      const buildingLayers = ['building', 'building-commercial', 'building-3d', 'building-3d-commercial', 'building-ada', 'building-metro'];
+      const buildingLayers = ['Riyadh building 3d'];
       
       // Set visibility based on isShowBuilding state (inverse logic as requested)
       const visibility = isShowBuilding ? 'none' : 'visible';
@@ -1872,12 +1888,12 @@ function MapComponent() {
               icon={<FaCalculator color="#333333" />}
               isActive={showCoverageStats}
             />
-            {/* <MapControlButton
+            <MapControlButton
               title={isShowAridGrid ? "Hide Grid" : "Show Grid"}
               onClick={toggleAridGrid}
               icon={<span style={{ color: "#333333" }}>Grid</span>}
               isActive={isShowAridGrid}
-            /> */}
+            /> 
             <CoverageStats
               showCoverageStats={showCoverageStats}
               coverageStats={coverageStats}
