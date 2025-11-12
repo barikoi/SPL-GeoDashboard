@@ -8,7 +8,7 @@ COPY package.json package-lock.json* ./
 
 # Install dependencies
 ENV SKIP_HUSKY=1
-RUN npm ci --omit=dev --force && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts --force && npm cache clean --force
 
 # Rebuild the source code only when needed
 FROM node:22-alpine AS builder
