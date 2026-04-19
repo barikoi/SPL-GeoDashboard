@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
   // Static credentials
   const VALID_CREDENTIALS = [
     // { email: 'geodash@spl.com', password: 'geodashspl2025' },
-    // { email: 'Rnmotmi@splonline.com.sa', password: 'raghadspl2025' },
+    { email: 'Rnmotmi@splonline.com.sa', password: 'raghadspl2025' },
     { email: 'phunsukhWangdu@spltest.com.sa', password: 'phunsukhWangdu@123' }
   ];
 
