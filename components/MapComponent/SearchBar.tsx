@@ -6,13 +6,39 @@ import splLogo from "../../app/images/spl_logo.png";
 
 interface SearchResult {
   id: string;
-  name: string;
-  address?: string;
+  poi_id: string;
+  name_en: string;
+  name_ar: string;
+  name?: string;
+  address_en?: string;
+  address_ar?: string;
+  category?: string;
+  sub_category?: string;
+  poi_type?: string;
+  poi_priority?: string;
   country?: string;
+  country_ar?: string;
+  country_code?: string;
   latitude?: number;
   longitude?: number;
-  geom?: any;
-  type?: string;
+  location?: number[];
+  geom?: number[];
+  city_en?: string;
+  city_ar?: string;
+  city_id?: string;
+  district_en?: string;
+  district_ar?: string;
+  district_id?: string;
+  governorate_en?: string;
+  governorate_ar?: string;
+  governorate_id?: string;
+  region_en?: string;
+  region_ar?: string;
+  region_id?: string;
+  zip_code?: string;
+  popularity_ranking?: number;
+  source?: string;
+  addendum_json?: Record<string, any>;
 }
 
 interface SearchBarProps {
@@ -69,28 +95,36 @@ const SearchBar: React.FC<SearchBarProps> = ({
           },
           headers: {
             'accept': 'application/json',
-            'X-API-KEY': '42fb21e647539b50a44eaaf2873124b7',
+            'X-API-KEY': process.env.NEXT_PUBLIC_AUTOCOMPLETE_API_KEY || '',
           },
         }
       );
 
       if (response.data && response.data.results) {
         const searchOptions = response.data.results.map((result: SearchResult, index: number) => ({
-          value: `${result.name}-${index}`,
+          value: `${result.name_en}-${index}`,
           label: (
             <div className="flex flex-col">
               {/* Logo & Name */}
               <div className="flex items-center">
                 <img src={splLogo.src} alt="SPL Logo" className="w-4 h-5 mr-2" />
-                <span className="font-bold">{result.name}</span>
+                <span className="font-bold mr-2">{result.name_en}</span>
+                {result.name_ar && (
+                  <span className="font-bold mr-2 text-gray-600" dir="rtl">{result.name_ar}</span>
+                )}
               </div>
 
-              {/* Address & Type */}
-              {result.address && (
+              {/* Address & Category */}
+              {result.address_en && (
                 <div className="flex flex-col mt-1 ml-6">
-                  <span className="text-xs text-gray-500 font-medium">{result.address}</span>
-                  {result.type && (
-                    <span className="text-xs text-gray-400 mt-1">{`(${result.type})`}</span>
+                  <span className="text-xs text-gray-500 font-medium">{result.address_en}</span>
+                  {result.address_ar && result.address_ar !== result.address_en && (
+                    <span className='text-xs text-gray-400' dir='rtl'>
+                      {result.address_ar}
+                    </span>
+                  )}
+                  {result.category && (
+                    <span className="text-xs text-gray-400 mt-1">{`(${result.sub_category})`}</span>
                   )}
                 </div>
               )}
@@ -129,31 +163,32 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   // Handle selection from dropdown
   // Handle selection from dropdown
-  const handleSelect = (value: string, option: any) => {
+  const handleSelect = (_value: string, option: any) => {
     const selectedResult = option.data as SearchResult;
-    // Set search bar value to the selected name
-    setSearchValue(selectedResult.name);
+    // Set search bar value to the selected English name
+    setSearchValue(selectedResult.name_en);
     if (onSearchValueChange) {
-      onSearchValueChange(selectedResult.name);
+      onSearchValueChange(selectedResult.name_en);
     }
 
     onLocationSelect(selectedResult);
 
     if (showPolygon) {
-      // Handle both non-empty and empty geom arrays
-      if (selectedResult.geom) {
-        showPolygon(selectedResult.geom, {
-          name: selectedResult.name,
-          address: selectedResult.address,
-          country: selectedResult.country,
-        });
+      const locationInfo = {
+        name_en: selectedResult.name_en,
+        name_ar: selectedResult.name_ar,
+        address_en: selectedResult.address_en,
+        address_ar: selectedResult.address_ar,
+        category: selectedResult.category,
+        sub_category: selectedResult.sub_category,
+        country: selectedResult.country,
+      };
+
+      if (selectedResult.geom && selectedResult.geom.length > 0) {
+        showPolygon(selectedResult.geom, locationInfo);
       } else if (selectedResult.latitude && selectedResult.longitude) {
         const coordinates: [number, number] = [selectedResult.longitude, selectedResult.latitude];
-        showPolygon(coordinates, {
-          name: selectedResult.name,
-          address: selectedResult.address,
-          country: selectedResult.country,
-        });
+        showPolygon(coordinates, locationInfo);
       }
     }
 

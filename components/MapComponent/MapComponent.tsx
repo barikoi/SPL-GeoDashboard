@@ -1686,41 +1686,24 @@ function MapComponent() {
   };
 
   const handleLocationSelect = (location: any) => {
-    
-    // Set the search marker based on location data
-    if (location.location && Array.isArray(location.location) && location.location.length === 2) {
-      // location.location is in [lat, lng] format, convert to [lng, lat] for the marker
-      const markerCoordinates: [number, number] = [location.location[1], location.location[0]];
-      
-      setSearchMarker({
-        coordinates: markerCoordinates,
-        properties: {
-          name: location.name,
-          address: location.address,
-          country: location.country,
-          type: location.type || 'search'
-        }
-      });
-      
-      // Fly to the marker coordinates (already in [lng, lat] format)
-      if (flyToLocation) {
-        flyToLocation(markerCoordinates, 14);
-      }
-      
-    } else if (location.longitude && location.latitude) {
-      // Fallback to longitude/latitude properties
+
+    // Use latitude/longitude directly
+    if (location.latitude && location.longitude) {
       const markerCoordinates: [number, number] = [location.longitude, location.latitude];
-      
+
       setSearchMarker({
         coordinates: markerCoordinates,
         properties: {
-          name: location.name,
-          address: location.address,
+          name: location.name_en || location.name,
+          name_ar: location.name_ar,
+          address: location.address_en,
+          category: location.category,
+          sub_category: location.sub_category,
           country: location.country,
-          type: location.type || 'search'
+          type: location.poi_type || 'search'
         }
       });
-      
+
       // Fly to the marker coordinates
       if (flyToLocation) {
         flyToLocation(markerCoordinates, 14);
@@ -1755,55 +1738,63 @@ function MapComponent() {
   };
 
   const showPolygon = (geojson: any, locationInfo: any) => {
-    
-    if (Array.isArray(geojson) && geojson.length > 0 && Array.isArray(geojson[0])) {
-      // Case 1: geojson is an array of coordinates - need to swap from [lat, lng] to [lng, lat]
-      
-      // Swap coordinates from [lat, lng] to [lng, lat] for GeoJSON format
-      const swappedCoords = geojson.map(coord => [coord[1], coord[0]]);
-      
+
+    if (Array.isArray(geojson) && geojson.length > 0 && typeof geojson[0] === 'number') {
+      // Case 1: flat geom array [lat1, lng1, lat2, lng2, ...] from API
+      const coords: [number, number][] = [];
+      for (let i = 0; i < geojson.length - 1; i += 2) {
+        // Swap from [lat, lng] to [lng, lat] for GeoJSON
+        coords.push([geojson[i + 1], geojson[i]]);
+      }
+
+      const polygonFeature = {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [coords]
+        },
+        properties: locationInfo
+      };
+
+      setSearchPolygon(polygonFeature);
+
+    } else if (Array.isArray(geojson) && geojson.length > 0 && Array.isArray(geojson[0])) {
+      // Case 2: array of coordinate pairs [[lat, lng], ...]
+
+      const swappedCoords = geojson.map((coord: number[]) => [coord[1], coord[0]]);
+
       const polygonFeature = {
         type: 'Feature' as const,
         geometry: {
           type: 'Polygon' as const,
           coordinates: [swappedCoords]
         },
-        properties: {
-          name: locationInfo.name,
-          address: locationInfo.address,
-          country: locationInfo.country
-        }
+        properties: locationInfo
       };
-      
+
       setSearchPolygon(polygonFeature);
-      
+
     } else if (typeof geojson === 'object' && geojson.type === 'Feature') {
-      // Case 2: geojson is already a GeoJSON feature
+      // Case 3: already a GeoJSON feature
       setSearchPolygon(geojson);
-      
+
     } else if (Array.isArray(geojson) && geojson.length === 2 && typeof geojson[0] === 'number') {
-      // Case 3: geojson is a point coordinate - swap from [lat, lng] to [lng, lat]
-      const coords = [geojson[1], geojson[0]]; 
-      
+      // Case 4: point coordinate [lng, lat] from SearchBar fallback
       const pointFeature = {
         type: 'Feature' as const,
         geometry: {
           type: 'Point' as const,
-          coordinates: coords
+          coordinates: geojson
         },
-        properties: {
-          name: locationInfo.name,
-          address: locationInfo.address,
-          country: locationInfo.country
-        }
+        properties: locationInfo
       };
-      
+
       setSearchPolygon(pointFeature);
     } else {
       setSearchPolygon([]);
       console.warn('Unknown geojson format:', geojson);
     }
-    
+
     setSearchLocationInfo(locationInfo);
   };
 
@@ -1956,9 +1947,35 @@ function MapComponent() {
             </div>
           ) : (hoverInfo.type === "search-polygon") ? (
             <div className="space-y-1">
-              <div className="font-semibold text-gray-800">{hoverInfo.object.properties.name}</div>
-              {hoverInfo.object.properties.address && (
-                <div><strong>Address:</strong> {hoverInfo.object.properties.address}</div>
+              <div className="font-semibold text-gray-800">
+                {hoverInfo.object.properties.name_en || hoverInfo.object.properties.name}
+                {hoverInfo.object.properties.name_ar && (
+                  <span className="mr-2 text-gray-600" dir="rtl"> ({hoverInfo.object.properties.name_ar})</span>
+                )}
+              </div>
+              {(hoverInfo.object.properties.address_en || hoverInfo.object.properties.address) && (
+                <div><strong>Address:</strong> {hoverInfo.object.properties.address_en || hoverInfo.object.properties.address}</div>
+              )}
+              {hoverInfo.object.properties.category && (
+                <div><strong>Category:</strong> {hoverInfo.object.properties.category}{hoverInfo.object.properties.sub_category ? ` - ${hoverInfo.object.properties.sub_category}` : ''}</div>
+              )}
+              {hoverInfo.object.properties.country && (
+                <div><strong>Country:</strong> {hoverInfo.object.properties.country}</div>
+              )}
+            </div>
+          ) : (hoverInfo.type === "search-result") ? (
+            <div className="space-y-1">
+              <div className="font-semibold text-gray-800">
+                <strong>Name:</strong> {hoverInfo.object.properties.name_en || hoverInfo.object.properties.name}
+                {hoverInfo.object.properties.name_ar && (
+                  <span className="mr-2 text-gray-600" dir="rtl"> ({hoverInfo.object.properties.name_ar})</span>
+                )}
+              </div>
+              {(hoverInfo.object.properties.address_en || hoverInfo.object.properties.address) && (
+                <div><strong>Address:</strong> {hoverInfo.object.properties.address_en || hoverInfo.object.properties.address}</div>
+              )}
+              {hoverInfo.object.properties.category && (
+                <div><strong>Category:</strong> {hoverInfo.object.properties.category}{hoverInfo.object.properties.sub_category ? ` - ${hoverInfo.object.properties.sub_category}` : ''}</div>
               )}
               {hoverInfo.object.properties.country && (
                 <div><strong>Country:</strong> {hoverInfo.object.properties.country}</div>
