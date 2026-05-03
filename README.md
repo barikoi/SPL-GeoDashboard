@@ -100,7 +100,7 @@ npm install
 Create a `.env` file in the root directory:
 
 ```env
-NEXT_PUBLIC_BASE_URL=https://na-routing.vng-solutions.com/api
+NEXT_PUBLIC_BASE_URL=https://na-routing.vng-solutions.com/api/v1
 NEXT_PUBLIC_BARIKOI_API_KEY=your_barikoi_api_key
 NEXT_PUBLIC_AUTOCOMPLETE_API_KEY=your_autocomplete_api_key
 ```
@@ -139,7 +139,7 @@ The app is served under `/spl` base path. Docker image: `rilusmahmud/spl-geodash
 ### Required Environment Variables for Docker
 
 ```env
-NEXT_PUBLIC_BASE_URL=https://na-routing.vng-solutions.com/api
+NEXT_PUBLIC_BASE_URL=https://na-routing.vng-solutions.com/api/v1
 NEXT_PUBLIC_AUTOCOMPLETE_API_KEY=your_autocomplete_api_key
 ```
 
@@ -152,6 +152,17 @@ NEXT_PUBLIC_AUTOCOMPLETE_API_KEY=your_autocomplete_api_key
 | `npm start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run prepare` | Install Husky git hooks |
+
+## Documentation
+
+Full documentation is available in the [`docs/`](docs/README.md) directory:
+
+- [Architecture](docs/architecture.md) — System overview, component tree, data flow
+- [API Collection](docs/api-collection.md) — All external API endpoints
+- [Features & User Flows](docs/features.md) — Step-by-step user flows
+- [Deployment](docs/deployment.md) — Docker, env vars, production setup
+- [Development Guide](docs/development.md) — Local setup, project structure, conventions
+- [State Management](docs/state-management.md) — Redux store, slices, actions
 
 ## License
 

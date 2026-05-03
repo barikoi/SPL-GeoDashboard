@@ -20,6 +20,6 @@ services:
     restart: unless-stopped
     environment:
       - NEXT_PUBLIC_BASE_URL=""
-      - NEXT_PUBLIC_BARIKOI_API_KEY=
+      - NEXT_PUBLIC_AUTOCOMPLETE_API_KEY=""
     ports:
       - "80:3000"
