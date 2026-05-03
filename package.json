@@ -1,13 +1,19 @@
 {
   "name": "saudi-post-spl",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "prepare": "husky"
+    "prepare": "husky",
+    "release": "standard-version",
+    "release:patch": "standard-version --release-as patch",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major",
+    "release:first": "standard-version --first-release",
+    "sync-version": "node sync-version.js"
   },
   "engines": {
     "node": ">=18.17.0 <23.0.0"
@@ -45,6 +51,7 @@
     "eslint-config-next": "14.2.35",
     "husky": "9.1.7",
     "postcss": "8.5.13",
+    "standard-version": "^9.5.0",
     "tailwindcss": "3.4.1",
     "typescript": "5.9.3"
   }
