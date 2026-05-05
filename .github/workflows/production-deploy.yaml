@@ -42,10 +42,15 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag ${{ env.DOCKER_USERNAME }}/spl-geodashboard:${GITHUB_REF##*/}-${{ steps.get-store.outputs.version }}
+        run: |
+          docker build . --file Dockerfile \
+            --tag ${{ env.DOCKER_USERNAME }}/spl-geodashboard:${GITHUB_REF##*/}-${{ steps.get-store.outputs.version }} \
+            --tag ${{ env.DOCKER_USERNAME }}/spl-geodashboard:main-latest
 
       - name: Docker Push
-        run: docker push ${{ env.DOCKER_USERNAME }}/spl-geodashboard:${GITHUB_REF##*/}-${{ steps.get-store.outputs.version }}
+        run: |
+          docker push ${{ env.DOCKER_USERNAME }}/spl-geodashboard:${GITHUB_REF##*/}-${{ steps.get-store.outputs.version }}
+          docker push ${{ env.DOCKER_USERNAME }}/spl-geodashboard:main-latest
 
       # - name: Succeeded
       #   uses: rjstone/discord-webhook-notify@v1

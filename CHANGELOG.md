@@ -4,6 +4,14 @@ All notable changes to the SPL GeoDashboard project.
 
 ---
 
+## [1.1.4] — 2026-05-05
+
+### Changed
+
+- Production deploy workflow now pushes a `main-latest` rolling tag alongside the versioned tag for Watchtower auto-updates
+
+---
+
 ## [1.1.3] — 2026-05-03
 
 ### Added
