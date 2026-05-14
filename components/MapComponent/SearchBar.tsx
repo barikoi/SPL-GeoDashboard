@@ -86,7 +86,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     try {
       setLoading(true);
       const response = await axios.get(
-        'https://na-maps.vng-solutions.com/spl/api/v1/search/autocomplete',
+        'https://na-maps.vng-solutions.com/spl/api/v2.0/search/autocomplete',
         {
           params: {
             q: query,
