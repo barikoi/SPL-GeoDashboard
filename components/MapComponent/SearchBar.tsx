@@ -21,8 +21,9 @@ interface SearchResult {
   country_code?: string;
   latitude?: number;
   longitude?: number;
-  location?: number[];
+  location?: { type: string; coordinates: [number, number] } | number[];
   geom?: number[];
+  geometry?: { type: string; coordinates: [number, number] } | null;
   city_en?: string;
   city_ar?: string;
   city_id?: string;
@@ -161,17 +162,47 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }, 1000);
   };
 
-  // Handle selection from dropdown
+  // Extract coordinates from result with fallbacks
+  const extractCoordinates = (result: SearchResult): { lat: number; lng: number } | null => {
+    // 1. Direct latitude/longitude fields
+    if (result.latitude != null && result.longitude != null) {
+      return { lat: Number(result.latitude), lng: Number(result.longitude) };
+    }
+    // 2. location as GeoJSON Point { type: "Point", coordinates: [lng, lat] }
+    if (result.location && !Array.isArray(result.location) && result.location.coordinates) {
+      const [lng, lat] = result.location.coordinates;
+      return { lat: Number(lat), lng: Number(lng) };
+    }
+    // 3. location as flat array [lng, lat] or [lat, lng]
+    if (Array.isArray(result.location) && result.location.length >= 2) {
+      return { lat: Number(result.location[1]), lng: Number(result.location[0]) };
+    }
+    // 4. geometry as GeoJSON Point
+    if (result.geometry && !Array.isArray(result.geometry) && result.geometry.coordinates) {
+      const [lng, lat] = result.geometry.coordinates;
+      return { lat: Number(lat), lng: Number(lng) };
+    }
+    // 5. geom flat array [lat, lng, ...]
+    if (result.geom && result.geom.length >= 2) {
+      if (Array.isArray(result.geom[0])) {
+        return { lat: Number(result.geom[0][0]), lng: Number(result.geom[0][1]) };
+      }
+      return { lat: Number(result.geom[0]), lng: Number(result.geom[1]) };
+    }
+    return null;
+  };
+
   // Handle selection from dropdown
   const handleSelect = (_value: string, option: any) => {
     const selectedResult = option.data as SearchResult;
-    // Set search bar value to the selected English name
     setSearchValue(selectedResult.name_en);
     if (onSearchValueChange) {
       onSearchValueChange(selectedResult.name_en);
     }
 
     onLocationSelect(selectedResult);
+
+    const coords = extractCoordinates(selectedResult);
 
     if (showPolygon) {
       const locationInfo = {
@@ -186,17 +217,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
       if (selectedResult.geom && selectedResult.geom.length > 0) {
         showPolygon(selectedResult.geom, locationInfo);
-      } else if (selectedResult.latitude && selectedResult.longitude) {
-        const coordinates: [number, number] = [selectedResult.longitude, selectedResult.latitude];
-        showPolygon(coordinates, locationInfo);
+      } else if (coords) {
+        showPolygon([coords.lng, coords.lat], locationInfo);
       }
     }
 
-    if (selectedResult.latitude && selectedResult.longitude && flyToLocation) {
-      flyToLocation([selectedResult.longitude, selectedResult.latitude], 14);
+    if (coords && flyToLocation) {
+      flyToLocation([coords.lng, coords.lat], 14);
     }
-
-    // Do not clear options to allow dropdown to persist
   };
 
   // Handle focus to show dropdown

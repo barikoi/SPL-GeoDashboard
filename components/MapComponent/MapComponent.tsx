@@ -1685,11 +1685,36 @@ function MapComponent() {
     setIsShowAridGrid(prev => !prev);
   };
 
-  const handleLocationSelect = (location: any) => {
+  // Extract coordinates from search result with fallbacks
+  const extractSearchCoordinates = (loc: any): { lat: number; lng: number } | null => {
+    if (loc.latitude != null && loc.longitude != null) {
+      return { lat: Number(loc.latitude), lng: Number(loc.longitude) };
+    }
+    if (loc.location && !Array.isArray(loc.location) && loc.location.coordinates) {
+      const [lng, lat] = loc.location.coordinates;
+      return { lat: Number(lat), lng: Number(lng) };
+    }
+    if (Array.isArray(loc.location) && loc.location.length >= 2) {
+      return { lat: Number(loc.location[1]), lng: Number(loc.location[0]) };
+    }
+    if (loc.geometry && !Array.isArray(loc.geometry) && loc.geometry.coordinates) {
+      const [lng, lat] = loc.geometry.coordinates;
+      return { lat: Number(lat), lng: Number(lng) };
+    }
+    if (loc.geom && loc.geom.length >= 2) {
+      if (Array.isArray(loc.geom[0])) {
+        return { lat: Number(loc.geom[0][0]), lng: Number(loc.geom[0][1]) };
+      }
+      return { lat: Number(loc.geom[0]), lng: Number(loc.geom[1]) };
+    }
+    return null;
+  };
 
-    // Use latitude/longitude directly
-    if (location.latitude && location.longitude) {
-      const markerCoordinates: [number, number] = [location.longitude, location.latitude];
+  const handleLocationSelect = (location: any) => {
+    const coords = extractSearchCoordinates(location);
+
+    if (coords) {
+      const markerCoordinates: [number, number] = [coords.lng, coords.lat];
 
       setSearchMarker({
         coordinates: markerCoordinates,
@@ -1704,7 +1729,6 @@ function MapComponent() {
         }
       });
 
-      // Fly to the marker coordinates
       if (flyToLocation) {
         flyToLocation(markerCoordinates, 14);
       }
